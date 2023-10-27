@@ -15,8 +15,8 @@ func CurrentTimeInMS() int64 {
 }
 
 type HLC struct {
-	lastWallTime	int64
-	currentHLC		*Timestamp
+	lastWallTime int64
+	currentHLC   *Timestamp
 
 	sync.RWMutex
 }
@@ -28,8 +28,8 @@ func init() {
 
 //initialize HLC with a given physical time
 func NewHLC(pt int64) *HLC {
-	t := Timestamp{LogicalTime:0, PhysicalTime:pt}
-	hlc := HLC{currentHLC:&t, lastWallTime:pt}
+	t := Timestamp{LogicalTime: 0, PhysicalTime: pt}
+	hlc := HLC{currentHLC: &t, lastWallTime: pt}
 	return &hlc
 }
 
@@ -37,7 +37,7 @@ func (hlc *HLC) ReadClock() Timestamp {
 	return *hlc.currentHLC //return timestamp
 }
 
-func (hlc *HLC) Now() Timestamp{
+func (hlc *HLC) Now() Timestamp {
 	hlc.Lock()
 	defer hlc.Unlock()
 
@@ -66,20 +66,16 @@ func (hlc *HLC) Update(t Timestamp) Timestamp {
 		return *hlc.currentHLC
 	}
 
-	if (t.GetPhysicalTime() > hlc.currentHLC.GetPhysicalTime()) {
+	if t.GetPhysicalTime() > hlc.currentHLC.GetPhysicalTime() {
 		hlc.currentHLC.SetPhysicalTime(t.GetPhysicalTime())
 		hlc.currentHLC.SetLogicalTime(t.GetLogicalTime() + 1)
-	} else if (hlc.currentHLC.GetPhysicalTime() > t.GetPhysicalTime()) {
-		hlc.currentHLC.IncrementLogical();
+	} else if hlc.currentHLC.GetPhysicalTime() > t.GetPhysicalTime() {
+		hlc.currentHLC.IncrementLogical()
 	} else {
-		if (t.GetLogicalTime() > hlc.currentHLC.GetLogicalTime()) {
-			hlc.currentHLC.SetLogicalTime(t.GetLogicalTime());
+		if t.GetLogicalTime() > hlc.currentHLC.GetLogicalTime() {
+			hlc.currentHLC.SetLogicalTime(t.GetLogicalTime())
 		}
-		hlc.currentHLC.IncrementLogical();
+		hlc.currentHLC.IncrementLogical()
 	}
-	return *hlc.currentHLC;
+	return *hlc.currentHLC
 }
-
-
-
-

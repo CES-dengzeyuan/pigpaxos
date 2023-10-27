@@ -1,10 +1,10 @@
 package hlc
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
-	"time"
 	"github.com/acharapko/fleetdb/utils"
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
 )
 
 func TestNewHLC(t *testing.T) {
@@ -19,7 +19,6 @@ func TestEmptyHLC(t *testing.T) {
 	assert.Equal(t, int64(0), hlc.currentHLC.PhysicalTime, "expected %d physical time, got %d", 0, hlc.currentHLC.PhysicalTime)
 	assert.Equal(t, int16(0), hlc.currentHLC.LogicalTime, "expected 0 logical time, got %d", hlc.currentHLC.LogicalTime)
 }
-
 
 func TestHLCNow(t *testing.T) {
 	pt := utils.CurrentTimeInMS()

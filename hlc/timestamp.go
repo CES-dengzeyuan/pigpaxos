@@ -1,9 +1,9 @@
 package hlc
 
 import (
+	"encoding/binary"
 	"math"
 	"time"
-	"encoding/binary"
 )
 
 // Timestamp constant values.
@@ -38,9 +38,9 @@ func (t Timestamp) ToBytes() []byte {
 
 /* Creates HLC from I64 representation of HLC time */
 func NewTimestampI64(hlc int64) *Timestamp {
-	wallTime := hlc >> 16;
-	logical := int16(hlc & 0x00000000000000FFFF);
-	t := Timestamp{PhysicalTime:wallTime, LogicalTime:logical}
+	wallTime := hlc >> 16
+	logical := int16(hlc & 0x00000000000000FFFF)
+	t := Timestamp{PhysicalTime: wallTime, LogicalTime: logical}
 	return &t
 }
 
@@ -50,12 +50,12 @@ func NewTimestampBytes(ts []byte) *Timestamp {
 }
 
 func NewTimestampPt(pt int64) *Timestamp {
-	t := Timestamp{PhysicalTime:pt, LogicalTime:0}
+	t := Timestamp{PhysicalTime: pt, LogicalTime: 0}
 	return &t
 }
 
 func NewTimestamp(pt int64, lc int16) *Timestamp {
-	t := Timestamp{PhysicalTime:pt, LogicalTime:lc}
+	t := Timestamp{PhysicalTime: pt, LogicalTime: lc}
 	return &t
 }
 
@@ -80,7 +80,7 @@ func (t *Timestamp) SetPhysicalTime(pt int64) {
 }
 
 func (t *Timestamp) SetLogicalTime(lc int16) {
-	t.LogicalTime = lc;
+	t.LogicalTime = lc
 }
 
 func (t *Timestamp) Compare(t2 *Timestamp) int {

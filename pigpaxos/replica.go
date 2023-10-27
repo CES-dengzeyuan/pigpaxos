@@ -88,11 +88,11 @@ func NewReplica(id paxi.ID) *Replica {
 	r.Register(P2b{}, r.handleP2b)
 	r.Register(P2bAggregated{}, r.handleP2bAggregated)
 	r.Register(P3{}, r.handleP3)
-	r.Register(P1a{}, r.handleP1a)
-	r.Register(P2a{}, r.handleP2a)
+	//r.Register(P1a{}, r.handleP1a)
+	//r.Register(P2a{}, r.handleP2a)
 	r.Register(P3RecoverRequest{}, r.HandleP3RecoverRequest)
 	r.Register(P3RecoverReply{}, r.HandleP3RecoverReply)
-	r.Register(P2a{}, r.handleP2a)
+	//r.Register(P2a{}, r.handleP2a)
 	r.Register(RoutedMsg{}, r.handleRoutedMsg)
 
 	r.pendingP1bRelay = 0
@@ -363,10 +363,10 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 // Forward Propagation
 //*********************************************************************************************************************
 
-func (r *Replica) handleP1a(m P1a) {
-	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
-	r.HandleP1a(m, m.Ballot.ID())
-}
+//func (r *Replica) handleP1a(m P1a) {
+//	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
+//	r.HandleP1a(m, m.Ballot.ID())
+//}
 
 func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	needToPropagate := false
@@ -401,10 +401,10 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	return needToPropagate
 }
 
-func (r *Replica) handleP2a(m P2a) {
-	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
-	r.HandleP2a(m, m.Ballot.ID())
-}
+//func (r *Replica) handleP2a(m P2a) {
+//	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
+//	r.HandleP2a(m, m.Ballot.ID())
+//}
 
 func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)

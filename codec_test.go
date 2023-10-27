@@ -18,23 +18,23 @@ type B struct {
 }
 
 type testP2b struct {
-	ID      []ID // from node id
-	Ballot  Ballot
-	Slot    int
+	ID     []ID // from node id
+	Ballot Ballot
+	Slot   int
 }
 
 type testP2bInt struct {
-	ID      []uint32 // from node id
-	Ballot  Ballot
-	Slot    int
+	ID     []uint32 // from node id
+	Ballot Ballot
+	Slot   int
 }
 
 type testP2bAggregate struct {
 	MissingIDs       []ID // node ids not collected by relay
-	RelayID			 ID
+	RelayID          ID
 	RelayLastExecute int
-	Ballot  		 Ballot
-	Slot    		 int
+	Ballot           Ballot
+	Slot             int
 }
 
 type testP2a struct {
@@ -241,7 +241,7 @@ func BenchmarkCodecGobSerializeP2a(b *testing.B) {
 
 	Cmd := Command{ClientID: NewIDFromString("1.1"), CommandID: 1, Key: 1, Value: v1}
 
-	send = testP2a{bal, 1, Cmd }
+	send = testP2a{bal, 1, Cmd}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -256,7 +256,6 @@ func BenchmarkCodecGobSerializePreAccept(b *testing.B) {
 
 	buf := new(bytes.Buffer)
 	c := NewCodec("gob", buf)
-
 
 	bal := NewBallot(0, NewIDFromString("1.1"))
 	v1 := GenerateRandVal(1)

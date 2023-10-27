@@ -1,4 +1,4 @@
-bin/*
+bin/client
 !bin/*.sh
 !bin/*.py
 !bin/*.json
