@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pigpaxos/pigpaxos/chain"
+	"pigpaxos/chain"
 
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/paxos"
+	"pigpaxos"
+	"pigpaxos/paxos"
 )
 
 var id = flag.String("id", "", "node id this client connects to")

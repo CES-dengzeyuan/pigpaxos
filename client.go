@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/lib"
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/lib"
+	"pigpaxos/log"
 )
 
 // Client interface provides get and put for key value store
@@ -33,12 +33,12 @@ type AdminClient interface {
 
 // HTTPClient inplements Client interface with REST API
 type HTTPClient struct {
-	Addrs  map[ID]string
-	HTTP   map[ID]string
-	IDs	   []ID
-	ID     ID  // client id use the same id as servers in local site
-	N      int // total number of nodes
-	LocalN int // number of nodes in local zone
+	Addrs    map[ID]string
+	HTTP     map[ID]string
+	IDs      []ID
+	ID       ID  // client id use the same id as servers in local site
+	N        int // total number of nodes
+	LocalN   int // number of nodes in local zone
 	localIDs []ID
 
 	CID int // command id
@@ -48,12 +48,12 @@ type HTTPClient struct {
 // NewHTTPClient creates a new Client from config
 func NewHTTPClient(id ID) *HTTPClient {
 	c := &HTTPClient{
-		ID:     id,
-		N:      len(config.Addrs),
-		Addrs:  config.Addrs,
-		HTTP:   config.HTTPAddrs,
-		Client: &http.Client{},
-		IDs:	config.IDs(),
+		ID:       id,
+		N:        len(config.Addrs),
+		Addrs:    config.Addrs,
+		HTTP:     config.HTTPAddrs,
+		Client:   &http.Client{},
+		IDs:      config.IDs(),
 		localIDs: make([]ID, 0),
 	}
 	if id != 0 {
@@ -77,7 +77,7 @@ func NewHTTPClient(id ID) *HTTPClient {
 func (c *HTTPClient) Get(key Key) (Value, error) {
 	c.CID++
 	v, _, err := c.RESTGet(c.ID, key)
-	if err !=nil {
+	if err != nil {
 		// change to talk to a different node
 		if c.ID != 0 {
 			c.ID = c.getRandomId()

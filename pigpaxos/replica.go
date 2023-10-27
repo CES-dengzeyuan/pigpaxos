@@ -3,9 +3,9 @@ package pigpaxos
 import (
 	"flag"
 	"fmt"
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/log"
 	"math/rand"
+	"pigpaxos"
+	"pigpaxos/log"
 	"sort"
 	"sync"
 	"time"
@@ -33,7 +33,7 @@ type RelayToLeader struct {
 }
 
 type PeerGroup struct {
-	nodes		[]paxi.ID
+	nodes []paxi.ID
 }
 
 func (pg *PeerGroup) GetRandomNodeId(excludeId paxi.ID, gray map[paxi.ID]time.Time) paxi.ID {
@@ -55,7 +55,7 @@ type Replica struct {
 	paxi.Node
 	*PigPaxos
 	relayGroups       []*PeerGroup
-	fixedRelays		  []paxi.ID
+	fixedRelays       []paxi.ID
 	myRelayGroup      int
 	NodeIdsToGroup    map[paxi.ID]int
 	numRelayGroups    int
@@ -63,11 +63,11 @@ type Replica struct {
 	relaySlack        int
 	cleanupMultiplier int
 
-	GrayNodes         map[paxi.ID]time.Time
+	GrayNodes map[paxi.ID]time.Time
 
-	p1bRelayRoutedMsg		  *RoutedMsg
-	pendingP1bRelay           int64
-	p1bRelayDepth			  uint8
+	p1bRelayRoutedMsg *RoutedMsg
+	pendingP1bRelay   int64
+	p1bRelayDepth     uint8
 
 	p2bRelaysMapByBalSlot     map[int]*RoutedMsg
 	p2bRelaysTimeMapByBalSlot map[int]int64
@@ -164,7 +164,7 @@ func (r *Replica) peersToGroups(numGroups int, nodeList []paxi.ID) []*PeerGroup 
 			r.myRelayGroup = pgNum
 		}
 		if peerGroups[pgNum] == nil {
-			peerGroups[pgNum] = &PeerGroup{nodes:make([]paxi.ID, 0)}
+			peerGroups[pgNum] = &PeerGroup{nodes: make([]paxi.ID, 0)}
 		}
 
 		peerGroups[pgNum].nodes = append(peerGroups[pgNum].nodes, id)
@@ -185,11 +185,11 @@ func (r *Replica) startTicker() {
 	for now := range time.Tick(TickerDuration * time.Millisecond) {
 		// log cleanup
 		ticks++
-		if ticks % uint64(r.cleanupMultiplier) == 0 {
+		if ticks%uint64(r.cleanupMultiplier) == 0 {
 			r.CleanupLog()
 		}
 
-		if ticks % uint64(GrayTimeoutMultiplier) == 0 {
+		if ticks%uint64(GrayTimeoutMultiplier) == 0 {
 			log.Debugf("Ticker gray check on tick %d", ticks)
 			r.GrayLock.Lock()
 			for grayId, t := range r.GrayNodes {
@@ -234,11 +234,11 @@ func (r *Replica) startTicker() {
 						p2b := routedP2b.Payload.(P2b)
 						if *useSmallP2b {
 							p2bSmall := P2bAggregated{
-								Ballot: p2b.Ballot,
-								Slot: p2b.Slot,
+								Ballot:           p2b.Ballot,
+								Slot:             p2b.Slot,
 								RelayLastExecute: r.execute - 1,
-								RelayID: r.ID(),
-								MissingIDs: r.computeMissingIDsForP2b(p2b),
+								RelayID:          r.ID(),
+								MissingIDs:       r.computeMissingIDsForP2b(p2b),
 							}
 							r.Send(routedP2b.GetLastProgressHop(), p2bSmall)
 						} else {
@@ -264,10 +264,10 @@ func (r *Replica) startTicker() {
 func (r *Replica) Broadcast(m interface{}) {
 	log.Debugf("PigPaxos Broadcast Msg: {%v}", m)
 	routedMsg := RoutedMsg{
-		Hops: make([]paxi.ID, 1),
+		Hops:      make([]paxi.ID, 1),
 		IsForward: true,
-		Progress: 0,
-		Payload: m,
+		Progress:  0,
+		Payload:   m,
 	}
 	routedMsg.Hops[0] = r.ID()
 	for i := 0; i < r.numRelayGroups; i++ {
@@ -278,7 +278,7 @@ func (r *Replica) Broadcast(m interface{}) {
 			r.GrayLock.RLock()
 			relayId = r.relayGroups[i].GetRandomNodeId(r.ID(), r.GrayNodes)
 			r.GrayLock.RUnlock()
-			log.Debugf("Generated Random Relay for RG #%d {%v}: %v",i, r.relayGroups[i], relayId)
+			log.Debugf("Generated Random Relay for RG #%d {%v}: %v", i, r.relayGroups[i], relayId)
 		}
 		r.Send(relayId, routedMsg)
 	}
@@ -314,6 +314,7 @@ func (r *Replica) Send(to paxi.ID, m interface{}) error {
 
 	return nil
 }
+
 //*********************************************************************************************************************
 // Routing
 //*********************************************************************************************************************
@@ -338,7 +339,7 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 		}
 
 		// forward propagation if needed
-		if m.Progress + 1 < r.maxDepth && needToPropagate {
+		if m.Progress+1 < r.maxDepth && needToPropagate {
 			// still not done going to the leaf nodes
 			m.Progress += 1
 			pgToBroadcast := r.relayGroups[r.myRelayGroup]
@@ -362,7 +363,7 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 // Forward Propagation
 //*********************************************************************************************************************
 
-func (r *Replica) handleP1a(m P1a)  {
+func (r *Replica) handleP1a(m P1a) {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
 	r.HandleP1a(m, m.Ballot.ID())
 }
@@ -372,7 +373,7 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling p1aRelay msg {%v}", r.ID(), m)
 	oldBallot := r.Ballot()
 	if oldBallot < m.Ballot {
-		if routedMsg.Progress + 1 < r.maxDepth {
+		if routedMsg.Progress+1 < r.maxDepth {
 			r.Lock()
 			if r.pendingP1bRelay > 0 {
 				// this is a ballot we have not seen... and have not relayed before
@@ -391,7 +392,7 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 		log.Debugf("Node %v received P1a with ballot %v, however, a newer or same ballot %v is known. Not relaying.", r.ID(), m.Ballot, oldBallot)
 	}
 
-	if routedMsg.Progress + 1 == r.maxDepth {
+	if routedMsg.Progress+1 == r.maxDepth {
 		r.HandleP1a(m, routedMsg.GetLastProgressHop())
 	} else {
 		r.HandleP1a(m, r.ID())
@@ -400,7 +401,6 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	return needToPropagate
 }
 
-
 func (r *Replica) handleP2a(m P2a) {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
 	r.HandleP2a(m, m.Ballot.ID())
@@ -408,7 +408,7 @@ func (r *Replica) handleP2a(m P2a) {
 
 func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
-	if routedMsg.Progress + 1 == r.maxDepth {
+	if routedMsg.Progress+1 == r.maxDepth {
 		r.HandleP2a(m, routedMsg.GetLastProgressHop())
 	} else {
 		// we are not at the leaf level yet, so need to have a relay setup
@@ -438,10 +438,10 @@ func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 
 func (r *Replica) newP2bRelay(m P2a, routedMsg RoutedMsg) {
 	routedP2b := RoutedMsg{
-		Hops: routedMsg.Hops,
-		IsForward:false,
-		Progress:routedMsg.Progress,
-		Payload:P2b{Ballot: m.Ballot, Slot: m.Slot, ID: make([]paxi.ID, 0)},
+		Hops:      routedMsg.Hops,
+		IsForward: false,
+		Progress:  routedMsg.Progress,
+		Payload:   P2b{Ballot: m.Ballot, Slot: m.Slot, ID: make([]paxi.ID, 0)},
 	}
 
 	r.p2bRelaysMapByBalSlot[m.Slot] = &routedP2b
@@ -469,7 +469,7 @@ func (r *Replica) handleP1bLeader(p1bs []P1b) {
 }
 
 func (r *Replica) handleP1b(m P1b) {
-	if r.pendingP1bRelay > 0 && r.p1bRelayRoutedMsg != nil{
+	if r.pendingP1bRelay > 0 && r.p1bRelayRoutedMsg != nil {
 		r.handleP1bRelay(m) // received p1b from leaf, aggregate it
 	} else {
 		log.Debugf("Node %v received P1b {%v}", r.ID(), m)
@@ -503,10 +503,10 @@ func (r *Replica) readyToRelayP1b(ballot paxi.Ballot, depth uint8) bool {
 	pgToRelay := r.relayGroups[r.myRelayGroup]
 	p1bs := r.p1bRelayRoutedMsg.Payload.([]P1b)
 	log.Debugf("Now have %d messages to relay for p1b Ballot %v. PeerGroup to relay is %d nodes at depth %d", len(p1bs), ballot, len(pgToRelay.nodes), depth)
-	if len(p1bs) == len(pgToRelay.nodes){
+	if len(p1bs) == len(pgToRelay.nodes) {
 		return true
 	}
-	if len(p1bs) == len(pgToRelay.nodes) - 1 {
+	if len(p1bs) == len(pgToRelay.nodes)-1 {
 		for _, id := range pgToRelay.nodes {
 			if id == ballot.ID() {
 				return true
@@ -519,7 +519,6 @@ func (r *Replica) readyToRelayP1b(ballot paxi.Ballot, depth uint8) bool {
 //***************
 // P2
 //***************
-
 
 func (r *Replica) handleP2b(m P2b) {
 	if r.IsLeader() {
@@ -544,9 +543,9 @@ func (r *Replica) handleP2bAggregated(m P2bAggregated) {
 			for _, missingId := range m.MissingIDs {
 				for i, id := range ids {
 					if id == missingId {
-						ids[i] = ids[len(ids) - 1]
-						ids[len(ids) - 1] = 0
-						ids = ids[:len(ids) - 1]
+						ids[i] = ids[len(ids)-1]
+						ids[len(ids)-1] = 0
+						ids = ids[:len(ids)-1]
 						break
 					}
 				}
@@ -590,11 +589,11 @@ func (r *Replica) handleP2bRelay(m P2b) {
 				if p2bForRelay.Progress == 0 {
 					if *useSmallP2b {
 						p2bSmall := P2bAggregated{
-							Ballot: m.Ballot,
-							Slot: m.Slot,
+							Ballot:           m.Ballot,
+							Slot:             m.Slot,
 							RelayLastExecute: r.execute - 1,
-							MissingIDs: missingIds,
-							RelayID: r.ID()}
+							MissingIDs:       missingIds,
+							RelayID:          r.ID()}
 						r.Send(p2bForRelay.GetLastProgressHop(), p2bSmall)
 					} else {
 						r.Send(p2bForRelay.GetLastProgressHop(), p2bForRelay.Payload)
@@ -625,9 +624,9 @@ func (r *Replica) computeMissingIDsForP2b(p2b P2b) []paxi.ID {
 	for _, id := range p2b.ID {
 		for i, missingId := range missingIds {
 			if id == missingId {
-				missingIds[i] = missingIds[len(missingIds) - 1]
-				missingIds[len(missingIds) - 1] = 0
-				missingIds = missingIds[:len(missingIds) - 1]
+				missingIds[i] = missingIds[len(missingIds)-1]
+				missingIds[len(missingIds)-1] = 0
+				missingIds = missingIds[:len(missingIds)-1]
 				break
 			}
 		}
@@ -643,10 +642,10 @@ func (r *Replica) readyToRelayP2b(m int) bool {
 	}
 	pgToRelay := r.relayGroups[r.myRelayGroup]
 	p2b := r.p2bRelaysMapByBalSlot[m].Payload.(P2b)
-	if len(p2b.ID) == len(pgToRelay.nodes) - r.relaySlack  {
+	if len(p2b.ID) == len(pgToRelay.nodes)-r.relaySlack {
 		return true
 	}
-	if len(p2b.ID) == len(pgToRelay.nodes) - 1 - r.relaySlack {
+	if len(p2b.ID) == len(pgToRelay.nodes)-1-r.relaySlack {
 		if r.NodeIdsToGroup[p2b.Ballot.ID()] == r.myRelayGroup {
 			return true
 		}

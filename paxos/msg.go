@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 func init() {
@@ -47,11 +47,11 @@ func (m P1b) String() string {
 
 // P2a accept message
 type P2a struct {
-	Ballot  			 paxi.Ballot
-	Slot    			 int
-	GlobalExecutedSlot   int
-	Command 			 paxi.Command
-	P3msg				 P3
+	Ballot             paxi.Ballot
+	Slot               int
+	GlobalExecutedSlot int
+	Command            paxi.Command
+	P3msg              P3
 }
 
 func (m P2a) String() string {
@@ -60,9 +60,9 @@ func (m P2a) String() string {
 
 // P2b accepted message
 type P2b struct {
-	Ballot paxi.Ballot
-	ID     paxi.ID // from node id
-	Slot   int
+	Ballot           paxi.Ballot
+	ID               paxi.ID // from node id
+	Slot             int
 	LastExecutedSlot int
 }
 
@@ -81,7 +81,6 @@ func (m P3) String() string {
 	return fmt.Sprintf("P3 {b=%v s=%d cmd=%v}", m.Ballot, m.Slot, m.Command)
 }
 
-
 type P3RecoverRequest struct {
 	Ballot paxi.Ballot
 	Slots  []int
@@ -89,15 +88,15 @@ type P3RecoverRequest struct {
 }
 
 func (m P3RecoverRequest) String() string {
-	return fmt.Sprintf("P3RecoverRequest {b=%v Slots=%v, nodeToRecover=%v}",  m.Ballot, m.Slots, m.NodeId)
+	return fmt.Sprintf("P3RecoverRequest {b=%v Slots=%v, nodeToRecover=%v}", m.Ballot, m.Slots, m.NodeId)
 }
 
 type P3RecoverReply struct {
-	Ballot    paxi.Ballot
-	Slots     []int
-	Commands  []paxi.Command
+	Ballot   paxi.Ballot
+	Slots    []int
+	Commands []paxi.Command
 }
 
 func (m P3RecoverReply) String() string {
-	return fmt.Sprintf("P3RecoverReply {b=%v slots=%v, cmd=%v}",  m.Ballot, m.Slots, m.Commands)
+	return fmt.Sprintf("P3RecoverReply {b=%v slots=%v, cmd=%v}", m.Ballot, m.Slots, m.Commands)
 }

@@ -1,13 +1,13 @@
 package paxi
 
 import (
-	"github.com/pigpaxos/pigpaxos/hlc"
-	"github.com/pigpaxos/pigpaxos/retro_log"
 	"net/http"
+	"pigpaxos/hlc"
+	"pigpaxos/retro_log"
 	"reflect"
 	"sync"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 var Retrolog *retro_log.RetroLog
@@ -35,7 +35,7 @@ type node struct {
 	handles     map[string]reflect.Value
 	server      *http.Server
 
-	recvCount	int
+	recvCount int
 
 	sync.RWMutex
 	forwards map[string]*Request

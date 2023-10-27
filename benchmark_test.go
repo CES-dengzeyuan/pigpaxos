@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 type FakeDB struct {

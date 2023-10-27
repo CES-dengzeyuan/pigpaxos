@@ -4,7 +4,7 @@ import (
 	"flag"
 	"net/http"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 // Init setup paxi package

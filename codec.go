@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 // Codec interface provide methods for serialization and deserialization

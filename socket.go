@@ -3,12 +3,12 @@ package paxi
 import (
 	"errors"
 	"fmt"
-	"github.com/pigpaxos/pigpaxos/hlc"
-	"github.com/pigpaxos/pigpaxos/retro_log"
 	"math/rand"
+	"pigpaxos/hlc"
+	"pigpaxos/retro_log"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 	"sync"
 )
 
@@ -49,10 +49,10 @@ type socket struct {
 	slow  map[ID]int
 	flaky map[ID]float64
 
-	msgid		int64
+	msgid int64
 
 	sync.RWMutex
-	sentCount	int
+	sentCount int
 }
 
 // NewSocket return Socket interface instance given self ID, node list, transport and codec name
@@ -66,7 +66,7 @@ func NewSocket(id ID, addrs map[ID]string) Socket {
 		drop:      make(map[ID]bool),
 		slow:      make(map[ID]int),
 		flaky:     make(map[ID]float64),
-		msgid:	   initMsgId,
+		msgid:     initMsgId,
 		sentCount: 0,
 	}
 
@@ -91,7 +91,7 @@ func (s *socket) Send(to ID, m interface{}) error {
 		rqlstruct := retro_log.NewRqlStruct(nil).AddVarInt("mid", msgId).AddVarInt32("to", int(to))
 		Retrolog.StartTx().AppendSetStruct("sentM", rqlstruct)
 		s.Lock()
-		s. sentCount++
+		s.sentCount++
 		Retrolog.AppendVarInt32("sentCount", s.sentCount).Commit()
 		s.Unlock()
 		return s.send(to, pm)

@@ -6,8 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
 	"math/rand"
+	"pigpaxos/log"
 )
 
 // Max of two int

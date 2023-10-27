@@ -3,8 +3,8 @@ package paxos
 import (
 	"strconv"
 
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos"
+	"pigpaxos/log"
 )
 
 // Client overwrites read operation for Paxos

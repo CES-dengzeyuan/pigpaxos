@@ -1,12 +1,12 @@
 package retro_log
 
 import (
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 	"sync"
 )
 
 type TimerRqlSet struct {
-	name string
+	name       string
 	expireTime int64
 
 	bucketTs []int64
@@ -15,8 +15,8 @@ type TimerRqlSet struct {
 	sync.RWMutex
 }
 
-func NewTimerRqlSet(name string, expireTime int64) * TimerRqlSet {
-	return &TimerRqlSet{name:name, expireTime:expireTime, buckets: make([][]string, 0), bucketTs: make([]int64, 0)}
+func NewTimerRqlSet(name string, expireTime int64) *TimerRqlSet {
+	return &TimerRqlSet{name: name, expireTime: expireTime, buckets: make([][]string, 0), bucketTs: make([]int64, 0)}
 }
 
 func (t *TimerRqlSet) Add(val string, ts int64) {
@@ -34,7 +34,7 @@ func (t *TimerRqlSet) Add(val string, ts int64) {
 		}
 	}
 	log.Debugf("Adding Items to bucket %d", ts)
-	t.buckets[len(t.buckets) - 1] = append(t.buckets[len(t.buckets) - 1], val)
+	t.buckets[len(t.buckets)-1] = append(t.buckets[len(t.buckets)-1], val)
 
 }
 
@@ -46,7 +46,7 @@ func (t *TimerRqlSet) ExpireItems(ts int64) *RqlSet {
 
 	lastExpiredIndex := -1
 	for index, bts := range t.bucketTs {
-		if bts + t.expireTime <= ts {
+		if bts+t.expireTime <= ts {
 			log.Debugf("Expiring Items in bucket %d at time %d", bts, ts)
 			removeSet.addAllVal(t.buckets[index])
 			lastExpiredIndex = index
@@ -54,14 +54,14 @@ func (t *TimerRqlSet) ExpireItems(ts int64) *RqlSet {
 	}
 
 	if lastExpiredIndex >= 0 {
-		t.bucketTs = append(t.bucketTs[:0], t.bucketTs[lastExpiredIndex + 1:]...)
-		t.buckets = append(t.buckets[:0], t.buckets[lastExpiredIndex + 1:]...)
+		t.bucketTs = append(t.bucketTs[:0], t.bucketTs[lastExpiredIndex+1:]...)
+		t.buckets = append(t.buckets[:0], t.buckets[lastExpiredIndex+1:]...)
 	}
 
 	return removeSet
 }
 
-func (t *TimerRqlSet) Snapshot() *RqlSet{
+func (t *TimerRqlSet) Snapshot() *RqlSet {
 	appendSet := NewRqlSet(t.name, true)
 	for _, bucket := range t.buckets {
 		appendSet.addAllVal(bucket)

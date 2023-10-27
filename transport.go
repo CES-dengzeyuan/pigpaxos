@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 var scheme = flag.String("transport", "tcp", "transport scheme (tcp, udp, chan), default tcp")

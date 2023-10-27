@@ -1,13 +1,13 @@
 package paxos
 
 import (
-	"github.com/pigpaxos/pigpaxos/hlc"
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/hlc"
+	"pigpaxos/log"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 // this is the difference we allow between max seen slot and executed slot
@@ -52,9 +52,9 @@ type Paxos struct {
 	ReplyWhenCommit bool
 
 	// Locks
-	logLck			sync.RWMutex
-	p3Lock			sync.RWMutex
-	markerLock		sync.RWMutex
+	logLck     sync.RWMutex
+	p3Lock     sync.RWMutex
+	markerLock sync.RWMutex
 }
 
 // NewPaxos creates new paxos instance
@@ -111,11 +111,11 @@ func (p *Paxos) P3Sync(tnow int64) {
 	p.logLck.RLock()
 	defer p.logLck.RUnlock()
 	log.Debugf("Syncing P3 (tnow=%d)", tnow)
-	if tnow - 10 > p.lastP3Time && p.lastP3Time > 0 && p.p3PendingBallot > 0 {
+	if tnow-10 > p.lastP3Time && p.lastP3Time > 0 && p.p3PendingBallot > 0 {
 		p.p3Lock.Lock()
 		p.Broadcast(P3{
-			Ballot:  p.p3PendingBallot,
-			Slot:    p.p3pendingSlots,
+			Ballot: p.p3PendingBallot,
+			Slot:   p.p3pendingSlots,
 		})
 		p.lastP3Time = tnow
 		p.p3pendingSlots = make([]int, 0, 100)
@@ -127,9 +127,9 @@ func (p *Paxos) CheckNeedForRecovery() {
 	p.logLck.RLock()
 	defer p.logLck.RUnlock()
 	// check if we state machine appears stuck and needs to recover some slots due to missing P3s or P2bs or both
-	if p.execute + ExecuteSlack < p.slot {
+	if p.execute+ExecuteSlack < p.slot {
 		recoverSlots := make([]int, 0)
-		for slot := p.execute; slot < p.slot - ExecuteSlack; slot++ {
+		for slot := p.execute; slot < p.slot-ExecuteSlack; slot++ {
 			e, exists := p.log[slot]
 			if !exists || !e.commit {
 				recoverSlots = append(recoverSlots, slot)
@@ -212,10 +212,10 @@ func (p *Paxos) P2a(r *paxi.Request) {
 	}
 	p.log[p.slot].quorum.ACK(p.ID())
 	m := P2a{
-		Ballot: 			p.ballot,
-		Slot:    			p.slot,
+		Ballot:             p.ballot,
+		Slot:               p.slot,
 		GlobalExecutedSlot: p.globalExecuted,
-		Command: 			r.Command,
+		Command:            r.Command,
 	}
 
 	p.p3Lock.Lock()
@@ -232,7 +232,6 @@ func (p *Paxos) P2a(r *paxi.Request) {
 		p.Broadcast(m)
 	}
 }
-
 
 // HandleP1a handles P1a message
 func (p *Paxos) HandleP1a(m P1a) {
@@ -326,10 +325,10 @@ func (p *Paxos) HandleP1b(m P1b) {
 				logEntry.quorum = paxi.NewQuorum()
 				logEntry.quorum.ACK(p.ID())
 				p.Broadcast(P2a{
-					Ballot:  			p.ballot,
-					Slot:    			i,
+					Ballot:             p.ballot,
+					Slot:               i,
 					GlobalExecutedSlot: p.globalExecuted,
-					Command: 			logEntry.command,
+					Command:            logEntry.command,
 				})
 			}
 			// propose new commands
@@ -380,9 +379,9 @@ func (p *Paxos) HandleP2a(m P2a) {
 	}
 
 	p.Send(m.Ballot.ID(), P2b{
-		Ballot: 		  p.ballot,
-		Slot:   		  m.Slot,
-		ID:     		  p.ID(),
+		Ballot:           p.ballot,
+		Slot:             m.Slot,
+		ID:               p.ID(),
 		LastExecutedSlot: p.execute,
 	})
 
@@ -411,8 +410,8 @@ func (p *Paxos) HandleP2b(m P2b) {
 		// send pending P3s we have for old ballot
 		p.p3Lock.Lock()
 		p.Broadcast(P3{
-			Ballot:  p.p3PendingBallot,
-			Slot:    p.p3pendingSlots,
+			Ballot: p.p3PendingBallot,
+			Slot:   p.p3pendingSlots,
 		})
 		p.lastP3Time = hlc.CurrentTimeInMS()
 		p.p3pendingSlots = make([]int, 0, 100)
@@ -527,7 +526,6 @@ func (p *Paxos) sendRecoverRequest(ballot paxi.Ballot, slots []int) {
 	})
 }
 
-
 // HandleP3RecoverRequest handles slot recovery request at leader
 func (p *Paxos) HandleP3RecoverRequest(m P3RecoverRequest) {
 	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.NodeId, m, p.ID())
@@ -555,13 +553,12 @@ func (p *Paxos) HandleP3RecoverRequest(m P3RecoverRequest) {
 		Commands: cmdsToRecover,
 	})
 
-
 	log.Debugf("Leaving HandleP3RecoverRequest")
 }
 
 // HandleP3RecoverReply handles slot recovery
 func (p *Paxos) HandleP3RecoverReply(m P3RecoverReply) {
-	log.Debugf("[%v]===>>> Replica %s\n",  m, p.ID())
+	log.Debugf("[%v]===>>> Replica %s\n", m, p.ID())
 	p.logLck.Lock()
 
 	for i, slot := range m.Slots {

@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 func init() {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 var file = flag.String("log", "log.csv", "")

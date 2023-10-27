@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 // DB is general interface implemented by client to call client library
@@ -69,7 +69,7 @@ func DefaultBConfig() Bconfig {
 		ZipfianS:             2,
 		ZipfianV:             1,
 		Lambda:               0.01,
-		Size:				  8,
+		Size:                 8,
 	}
 }
 
@@ -271,7 +271,7 @@ func (b *Benchmark) worker(keys <-chan int, result chan<- time.Duration) {
 			lat := e.Sub(s)
 			result <- lat
 			if lat.Nanoseconds() > 100000000 {
-				log.Infof("Operation %v on key %v took too long: %d ms", op, k, lat / 1000000.0)
+				log.Infof("Operation %v on key %v took too long: %d ms", op, k, lat/1000000.0)
 			}
 		} else {
 			op.end = math.MaxInt64

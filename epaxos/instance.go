@@ -1,6 +1,6 @@
 package epaxos
 
-import "github.com/pigpaxos/pigpaxos"
+import "pigpaxos"
 
 type status int8
 

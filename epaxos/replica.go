@@ -2,8 +2,8 @@ package epaxos
 
 import (
 	"flag"
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/lib"
+	"pigpaxos"
+	"pigpaxos/lib"
 )
 
 var replyWhenCommit = flag.Bool("ReplyWhenCommit", false, "Reply to client when request is committed, instead of executed")
@@ -36,11 +36,11 @@ func NewReplica(id paxi.ID) *Replica {
 		graph:        lib.NewGraph(),
 	}
 	for id := range paxi.GetConfig().Addrs {
-		r.log[id] = make(map[int]*instance, paxi.GetConfig().BufferSize * 10000)
+		r.log[id] = make(map[int]*instance, paxi.GetConfig().BufferSize*10000)
 		r.slot[id] = -1
 		r.committed[id] = -1
 		r.executed[id] = -1
-		r.conflicts[id] = make(map[paxi.Key]int, paxi.GetConfig().BufferSize * 1000)
+		r.conflicts[id] = make(map[paxi.Key]int, paxi.GetConfig().BufferSize*1000)
 	}
 
 	r.Register(paxi.Request{}, r.handleRequest)

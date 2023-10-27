@@ -1,7 +1,7 @@
 package paxi
 
 import (
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 	"strconv"
 	"strings"
 )
@@ -23,13 +23,13 @@ func NewIDFromString(idstr string) ID {
 		return 0
 	}
 	zone, err := strconv.Atoi(idParts[0])
-	if err!= nil {
+	if err != nil {
 		log.Errorf("Invalid id: %v", idstr)
 		return 0
 	}
 
 	node, err := strconv.Atoi(idParts[1])
-	if err!= nil {
+	if err != nil {
 		log.Errorf("Invalid id: %v", idstr)
 		return 0
 	}
@@ -39,13 +39,13 @@ func NewIDFromString(idstr string) ID {
 
 // Zone returns Zone ID component
 func (i ID) Zone() int {
-	return int(i>>16)
+	return int(i >> 16)
 }
 
 // Node returns Node ID component
 func (i ID) Node() int {
 	var z uint32 = 0x0000FFFF
-	return int(z&(uint32(i)))
+	return int(z & (uint32(i)))
 }
 
 func (i ID) String() string {

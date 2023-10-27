@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 // Policy defines a trigger for data access patterns, that can be used in data migration protocols

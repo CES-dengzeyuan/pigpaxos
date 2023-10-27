@@ -4,11 +4,11 @@ import (
 	"flag"
 	"sync"
 
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/epaxos"
-	"github.com/pigpaxos/pigpaxos/log"
-	"github.com/pigpaxos/pigpaxos/paxos"
-	"github.com/pigpaxos/pigpaxos/pigpaxos"
+	"pigpaxos"
+	"pigpaxos/epaxos"
+	"pigpaxos/log"
+	"pigpaxos/paxos"
+	"pigpaxos/pigpaxos"
 )
 
 var algorithm = flag.String("algorithm", "paxos", "Distributed algorithm")

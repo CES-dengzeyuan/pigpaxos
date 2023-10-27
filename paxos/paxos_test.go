@@ -3,7 +3,7 @@ package paxos
 import (
 	"testing"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 func TestPaxos(t *testing.T) {

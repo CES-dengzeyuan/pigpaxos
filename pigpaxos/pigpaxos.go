@@ -1,12 +1,12 @@
 package pigpaxos
 
 import (
-	"github.com/pigpaxos/pigpaxos/hlc"
-	"github.com/pigpaxos/pigpaxos/retro_log"
+	"pigpaxos"
+	"pigpaxos/hlc"
+	"pigpaxos/retro_log"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 	"sync"
 )
 
@@ -25,24 +25,23 @@ type PigPaxos struct {
 	paxi.Node
 
 	// log management variables
-	log           		map[int]*entry  // log ordered by slot
-	slot          		int             // highest slot number
-	execute       		int             // next execute slot number
-	lastCleanupMarker 	int
-	globalExecute 		int             // executed by all nodes. Need for log cleanup
-	executeByNode 		map[paxi.ID]int // leader's knowledge of other nodes execute counter. Need for log cleanup
+	log               map[int]*entry // log ordered by slot
+	slot              int            // highest slot number
+	execute           int            // next execute slot number
+	lastCleanupMarker int
+	globalExecute     int             // executed by all nodes. Need for log cleanup
+	executeByNode     map[paxi.ID]int // leader's knowledge of other nodes execute counter. Need for log cleanup
 
 	//Paxos management
-	active        	bool            // active leader
-	ballot        	paxi.Ballot     // highest ballot number
-	p1aTime       	int64           // time P1a was sent
-	quorum   		*paxi.Quorum    // phase 1 quorum
-	requests 		[]*paxi.Request // phase 1 pending requests
+	active   bool            // active leader
+	ballot   paxi.Ballot     // highest ballot number
+	p1aTime  int64           // time P1a was sent
+	quorum   *paxi.Quorum    // phase 1 quorum
+	requests []*paxi.Request // phase 1 pending requests
 
 	p3PendingBallot paxi.Ballot
 	p3pendingSlots  []int
 	lastP3Time      int64
-
 
 	// Quorums
 	Q1              func(*paxi.Quorum) bool
@@ -50,9 +49,9 @@ type PigPaxos struct {
 	ReplyWhenCommit bool
 
 	// Locks
-	logLck			sync.RWMutex
-	p3Lock			sync.RWMutex
-	markerLock		sync.RWMutex
+	logLck     sync.RWMutex
+	p3Lock     sync.RWMutex
+	markerLock sync.RWMutex
 }
 
 // NewPaxos creates new paxos instance
@@ -63,7 +62,7 @@ func NewPigPaxos(n paxi.Node, options ...func(*PigPaxos)) *PigPaxos {
 		slot:            -1,
 		quorum:          paxi.NewQuorum(),
 		requests:        make([]*paxi.Request, 0),
-		p3pendingSlots:  make([]int,0, 100),
+		p3pendingSlots:  make([]int, 0, 100),
 		executeByNode:   make(map[paxi.ID]int, 0),
 		lastP3Time:      0,
 		Q1:              func(q *paxi.Quorum) bool { return q.Majority() },
@@ -100,15 +99,15 @@ func (p *PigPaxos) CheckTimeout(timeout int64) {
 	}
 
 	tnow := hlc.CurrentTimeInMS()
-	if tnow - 10 > p.lastP3Time && p.lastP3Time > 0 && p.p3PendingBallot > 0 {
+	if tnow-10 > p.lastP3Time && p.lastP3Time > 0 && p.p3PendingBallot > 0 {
 		log.Debugf("Sending P3 on timeout: %v", p.p3PendingBallot)
 		p.p3Lock.Lock()
 		p.Broadcast(P3{
-			Ballot:  p.p3PendingBallot,
-			Slot:    p.p3pendingSlots,
+			Ballot: p.p3PendingBallot,
+			Slot:   p.p3pendingSlots,
 		})
 		p.lastP3Time = hlc.CurrentTimeInMS()
-		p.p3pendingSlots = make([]int,0, 100)
+		p.p3pendingSlots = make([]int, 0, 100)
 		p.p3Lock.Unlock()
 	}
 }
@@ -216,16 +215,16 @@ func (p *PigPaxos) P2a(r *paxi.Request) {
 	}
 	p.log[p.slot].quorum.ACK(p.ID())
 	m := P2a{
-		Ballot:  p.ballot,
-		Slot:    p.slot,
-		Command: r.Command,
+		Ballot:        p.ballot,
+		Slot:          p.slot,
+		Command:       r.Command,
 		GlobalExecute: p.globalExecute,
 	}
 	p.logLck.Unlock()
 	p.p3Lock.Lock()
 	if p.p3PendingBallot > 0 {
 		m.P3msg = P3{Ballot: p.p3PendingBallot, Slot: p.p3pendingSlots}
-		p.p3pendingSlots = make([]int,0, 100)
+		p.p3pendingSlots = make([]int, 0, 100)
 		p.lastP3Time = hlc.CurrentTimeInMS()
 	}
 	p.p3Lock.Unlock()
@@ -241,9 +240,9 @@ func (p *PigPaxos) P2a(r *paxi.Request) {
 func (p *PigPaxos) RetryP2a(slot int, e *entry) {
 	log.Debugf("Entering RetryP2a with slot %d", slot)
 	m := P2a{
-		Ballot:  p.ballot,
-		Slot:    slot,
-		Command: e.command,
+		Ballot:        p.ballot,
+		Slot:          slot,
+		Command:       e.command,
 		GlobalExecute: p.globalExecute,
 	}
 	if paxi.GetConfig().Thrifty {
@@ -338,9 +337,9 @@ func (p *PigPaxos) HandleP1b(m P1b) {
 				p.log[i].quorum = paxi.NewQuorum()
 				p.log[i].quorum.ACK(p.ID())
 				p.Broadcast(P2a{
-					Ballot:  p.ballot,
-					Slot:    i,
-					Command: p.log[i].command,
+					Ballot:        p.ballot,
+					Slot:          i,
+					Command:       p.log[i].command,
 					GlobalExecute: p.globalExecute,
 				})
 			}
@@ -425,8 +424,8 @@ func (p *PigPaxos) HandleP2b(msgSlot int, msgBallot paxi.Ballot, votedIds []paxi
 		// send pending P3s we have for old ballot
 		p.p3Lock.Lock()
 		p.Broadcast(P3{
-			Ballot:  p.p3PendingBallot,
-			Slot:    p.p3pendingSlots,
+			Ballot: p.p3PendingBallot,
+			Slot:   p.p3pendingSlots,
 		})
 		p.lastP3Time = hlc.CurrentTimeInMS()
 		p.p3pendingSlots = make([]int, 0, 100)
@@ -527,9 +526,9 @@ func (p *PigPaxos) HandleP3RecoverRequest(m P3RecoverRequest) {
 	if exist && e.commit {
 		// ok to recover
 		p.Send(m.NodeId, P3RecoverReply{
-			Ballot: e.ballot,
-			Slot:   m.Slot,
-			Command:e.command,
+			Ballot:  e.ballot,
+			Slot:    m.Slot,
+			Command: e.command,
 		})
 	}
 
@@ -554,16 +553,15 @@ func (p *PigPaxos) HandleP3RecoverReply(m P3RecoverReply) {
 	log.Debugf("Leaving HandleP3RecoverReply")
 }
 
-
 func (p *PigPaxos) exec() {
 	log.Debugf("Entering exec. exec slot=%d", p.execute)
 	p.logLck.Lock()
 	defer p.logLck.Unlock()
 	for {
 		e, ok := p.log[p.execute]
-		if ok && p.execute + 10 < p.slot && e.commit && e.ballot == 0 {
+		if ok && p.execute+10 < p.slot && e.commit && e.ballot == 0 {
 			// ask to recover the slot
-			log.Debugf("Replica %s tries to recover slot %d on ballot %v", p.ID(),  p.execute, p.Ballot())
+			log.Debugf("Replica %s tries to recover slot %d on ballot %v", p.ID(), p.execute, p.Ballot())
 			p.sendRecoverRequest(p.Ballot(), p.execute)
 		}
 

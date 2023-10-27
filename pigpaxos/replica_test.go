@@ -1,7 +1,6 @@
 package pigpaxos
 
 import (
-	"github.com/pigpaxos/pigpaxos"
 	"testing"
 )
 

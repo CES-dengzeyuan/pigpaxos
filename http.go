@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 // http request header names

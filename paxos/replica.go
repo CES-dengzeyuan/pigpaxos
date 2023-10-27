@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pigpaxos/pigpaxos"
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos"
+	"pigpaxos/log"
 )
 
 var ephemeralLeader = flag.Bool("ephemeral_leader", false, "unstable leader, if true paxos replica try to become leader instead of forward requests to current leader")
@@ -52,7 +52,7 @@ func (r *Replica) startTicker() {
 	for now := range time.Tick(10 * time.Millisecond) {
 		// log cleanup
 		ticks++
-		if ticks % r.cleanupMultiplier == 0 {
+		if ticks%r.cleanupMultiplier == 0 {
 			r.CleanupLog()
 		}
 

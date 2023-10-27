@@ -5,28 +5,28 @@ import (
 	"flag"
 	"os"
 
-	"github.com/pigpaxos/pigpaxos/log"
+	"pigpaxos/log"
 )
 
 var configFile = flag.String("config", "config.json", "Configuration file for paxi replica. Defaults to config.json.")
 
 // Config contains every system configuration
 type Config struct {
-	Addrs     		map[ID]string       					// address for node communication
-	AddrsStr   		map[string]string `json:"address"`      // address for node communication
-	HTTPAddrs 		map[ID]string 							// address for client server communication
-	HTTPAddrsStr	map[string]string `json:"http_address"` // address for client server communication
+	Addrs        map[ID]string     // address for node communication
+	AddrsStr     map[string]string `json:"address"` // address for node communication
+	HTTPAddrs    map[ID]string     // address for client server communication
+	HTTPAddrsStr map[string]string `json:"http_address"` // address for client server communication
 
-	UseRetroLog		bool 	 `json:"use_retro_log"`
+	UseRetroLog bool `json:"use_retro_log"`
 
-	Policy    		string  `json:"policy"`    // leader change policy {consecutive, majority}
-	Threshold 		float64 `json:"threshold"` // threshold for policy in WPaxos {n consecutive or time interval in ms}
+	Policy    string  `json:"policy"`    // leader change policy {consecutive, majority}
+	Threshold float64 `json:"threshold"` // threshold for policy in WPaxos {n consecutive or time interval in ms}
 
-	Thrifty         bool    `json:"thrifty"`          // only send messages to a quorum
-	BufferSize      int     `json:"buffer_size"`      // buffer size for maps
-	ChanBufferSize  int     `json:"chan_buffer_size"` // buffer size for channels
-	MultiVersion    bool    `json:"multiversion"`     // create multi-version database
-	Benchmark       Bconfig `json:"benchmark"`        // benchmark configuration
+	Thrifty        bool    `json:"thrifty"`          // only send messages to a quorum
+	BufferSize     int     `json:"buffer_size"`      // buffer size for maps
+	ChanBufferSize int     `json:"chan_buffer_size"` // buffer size for channels
+	MultiVersion   bool    `json:"multiversion"`     // create multi-version database
+	Benchmark      Bconfig `json:"benchmark"`        // benchmark configuration
 
 	// for future implementation
 	// Batching bool `json:"batching"`
@@ -59,14 +59,14 @@ func Simulation() {
 // only used by init() and master
 func MakeDefaultConfig() Config {
 	return Config{
-		Addrs:			make(map[ID]string),
-		HTTPAddrs:		make(map[ID]string),
+		Addrs:          make(map[ID]string),
+		HTTPAddrs:      make(map[ID]string),
 		Policy:         "consecutive",
 		Threshold:      3,
 		BufferSize:     1024,
 		ChanBufferSize: 1024,
 		MultiVersion:   false,
-		UseRetroLog:	false,
+		UseRetroLog:    false,
 		Benchmark:      DefaultBConfig(),
 	}
 }

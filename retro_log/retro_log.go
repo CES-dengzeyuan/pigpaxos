@@ -2,17 +2,17 @@ package retro_log
 
 import (
 	"fmt"
-	"github.com/pigpaxos/pigpaxos/hlc"
-	"github.com/pigpaxos/pigpaxos/log"
 	"os"
+	"pigpaxos/hlc"
+	"pigpaxos/log"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 type RetroVar struct {
-	name	*string
-	valstr	string
+	name   *string
+	valstr string
 }
 
 func (v *RetroVar) varToStr() string {
@@ -31,7 +31,7 @@ type RqlStruct struct {
 }
 
 func NewRqlStruct(structName *string) *RqlStruct {
-	return &RqlStruct{name: structName, vars: make([]*RetroVar ,0)}
+	return &RqlStruct{name: structName, vars: make([]*RetroVar, 0)}
 }
 
 func (s *RqlStruct) structToStr() string {
@@ -47,7 +47,7 @@ func (s *RqlStruct) structToStr() string {
 	sb.WriteString("[")
 	for i, v := range s.vars {
 		sb.WriteString(v.varToStr())
-		if i + 1 < len(s.vars) {
+		if i+1 < len(s.vars) {
 			sb.WriteString(",")
 		}
 	}
@@ -86,14 +86,14 @@ func (s *RqlStruct) AddVarFloat(name string, val float64) *RqlStruct {
 }
 
 type RqlSet struct {
-	name	*string
+	name *string
 	//vars	[]string
-	vars	map[string] bool
-	isAdd	bool
+	vars  map[string]bool
+	isAdd bool
 }
 
 func NewRqlSet(setName string, isAdd bool) *RqlSet {
-	return &RqlSet{name: &setName, vars: make(map[string] bool), isAdd: isAdd}
+	return &RqlSet{name: &setName, vars: make(map[string]bool), isAdd: isAdd}
 }
 
 func (s *RqlSet) writeRqlSet(sb *strings.Builder, erase bool) {
@@ -117,7 +117,7 @@ func (s *RqlSet) writeRqlSet(sb *strings.Builder, erase bool) {
 	sb.WriteString("}")
 
 	if erase {
-		s.vars = make(map[string] bool, 0)
+		s.vars = make(map[string]bool, 0)
 	}
 }
 
@@ -142,22 +142,22 @@ func (s *RqlSet) removeAllVal(val []string) {
 }
 
 type RetroLog struct {
-	name 		string
-	nodeIdStr	string
-	logfile		*os.File
-	sb 			strings.Builder
+	name      string
+	nodeIdStr string
+	logfile   *os.File
+	sb        strings.Builder
 
-	ts 			*hlc.Timestamp
+	ts *hlc.Timestamp
 
 	tempVars      []*RetroVar
 	tempAddSet    map[string]*RqlSet
 	tempRemoveSet map[string]*RqlSet
 
-	snapVars	  map[string]*RetroVar
-	snapSets	  map[string]*RqlSet
-	expireSets    map[string]*TimerRqlSet
+	snapVars   map[string]*RetroVar
+	snapSets   map[string]*RqlSet
+	expireSets map[string]*TimerRqlSet
 
-	blockSize	  int
+	blockSize     int
 	lastBlockTime int64
 
 	takeSnapshots bool
@@ -169,9 +169,9 @@ type RetroLog struct {
 
 func NewRetroLog(name string, id int, logdir string, blockSize int, takeSnapshots bool) *RetroLog {
 	pid := os.Getpid()
-	f, err := os.OpenFile(logdir + "retro_" + strconv.Itoa(pid) + ".log",
-		os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0755)
-	if err != nil{
+	f, err := os.OpenFile(logdir+"retro_"+strconv.Itoa(pid)+".log",
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
 		log.Fatalf("Could not create retroscope log file for pid %v", pid)
 	}
 
@@ -186,18 +186,18 @@ func NewRetroLog(name string, id int, logdir string, blockSize int, takeSnapshot
 	snapVars[vName] = &RetroVar{name: &vName, valstr: "1"}
 
 	return &RetroLog{
-		name:          	name,
-		nodeIdStr:    	strconv.Itoa(id),
-		logfile:      	f,
-		blockSize:		blockSize,
-		lastBlockTime:  0,
-		tempVars:    	make([]*RetroVar, 0),
-		tempAddSet:  	addSet,
-		tempRemoveSet: 	removeSet,
-		expireSets:    	expireSets,
-		snapVars: 	   	snapVars,
-	    snapSets:	   	snapSets,
-		takeSnapshots:	takeSnapshots}
+		name:          name,
+		nodeIdStr:     strconv.Itoa(id),
+		logfile:       f,
+		blockSize:     blockSize,
+		lastBlockTime: 0,
+		tempVars:      make([]*RetroVar, 0),
+		tempAddSet:    addSet,
+		tempRemoveSet: removeSet,
+		expireSets:    expireSets,
+		snapVars:      snapVars,
+		snapSets:      snapSets,
+		takeSnapshots: takeSnapshots}
 }
 
 func (l *RetroLog) StartTx() *RetroLog {
@@ -256,7 +256,7 @@ func (l *RetroLog) CreateTimerSet(setName string, expireTime int64) {
 	l.expireSets[setName] = NewTimerRqlSet(setName, expireTime)
 }
 
-func (l *RetroLog) appendSet(setName string, setVal string) *RetroLog{
+func (l *RetroLog) appendSet(setName string, setVal string) *RetroLog {
 	l.Lock()
 	defer l.Unlock()
 
@@ -275,30 +275,30 @@ func (l *RetroLog) appendSet(setName string, setVal string) *RetroLog{
 	return l
 }
 
-func (l *RetroLog) AppendSetStr(setName string, setVal string) *RetroLog{
-	return l.appendSet(setName, "\"" + setVal + "\"")
+func (l *RetroLog) AppendSetStr(setName string, setVal string) *RetroLog {
+	return l.appendSet(setName, "\""+setVal+"\"")
 }
 
-func (l *RetroLog) AppendSetInt32(setName string, setVal int) *RetroLog{
+func (l *RetroLog) AppendSetInt32(setName string, setVal int) *RetroLog {
 	strval := fmt.Sprintf("%d", setVal)
 	return l.appendSet(setName, strval)
 }
 
-func (l *RetroLog) AppendSetInt(setName string, setVal int64) *RetroLog{
+func (l *RetroLog) AppendSetInt(setName string, setVal int64) *RetroLog {
 	strval := fmt.Sprintf("%d", setVal)
 	return l.appendSet(setName, strval)
 }
 
-func (l *RetroLog) AppendSetFloat(setName string, setVal float64) *RetroLog{
+func (l *RetroLog) AppendSetFloat(setName string, setVal float64) *RetroLog {
 	valStr := fmt.Sprintf("%f", setVal)
 	return l.appendSet(setName, valStr)
 }
 
-func (l *RetroLog) AppendSetStruct(setName string, setVal *RqlStruct) *RetroLog{
+func (l *RetroLog) AppendSetStruct(setName string, setVal *RqlStruct) *RetroLog {
 	return l.appendSet(setName, setVal.structToStr())
 }
 
-func (l *RetroLog) removeSet(setName string, setVal string) *RetroLog{
+func (l *RetroLog) removeSet(setName string, setVal string) *RetroLog {
 	l.Lock()
 	defer l.Unlock()
 	snapSet, snapOk := l.snapSets[setName]
@@ -317,21 +317,21 @@ func (l *RetroLog) removeSet(setName string, setVal string) *RetroLog{
 	return l
 }
 
-func (l *RetroLog) RemoveSetStr(setName string, setVal string) *RetroLog{
-	return l.removeSet(setName, "\"" + setVal + "\"")
+func (l *RetroLog) RemoveSetStr(setName string, setVal string) *RetroLog {
+	return l.removeSet(setName, "\""+setVal+"\"")
 }
 
-func (l *RetroLog) RemoveSetInt(setName string, setVal int64) *RetroLog{
+func (l *RetroLog) RemoveSetInt(setName string, setVal int64) *RetroLog {
 	strval := fmt.Sprintf("%d", setVal)
 	return l.removeSet(setName, strval)
 }
 
-func (l *RetroLog) RemoveSetFloat(setName string, setVal float64) *RetroLog{
+func (l *RetroLog) RemoveSetFloat(setName string, setVal float64) *RetroLog {
 	valStr := fmt.Sprintf("%f", setVal)
 	return l.removeSet(setName, valStr)
 }
 
-func (l *RetroLog) RemoveSetStruct(setName string, setVal *RqlStruct) *RetroLog{
+func (l *RetroLog) RemoveSetStruct(setName string, setVal *RqlStruct) *RetroLog {
 	return l.removeSet(setName, setVal.structToStr())
 }
 
@@ -355,7 +355,7 @@ func (l *RetroLog) Commit() {
 	defer l.Unlock()
 	defer l.txLock.Unlock()
 
-	if l.ts == nil{
+	if l.ts == nil {
 		log.Error("Cannot commit RetroLog. Transaction was not started")
 	}
 
@@ -395,7 +395,7 @@ func (l *RetroLog) writeSnapVars() bool {
 	writtenValsCount := 1
 	for _, v := range l.snapVars {
 		l.sb.WriteString(v.varToStr())
-		if writtenValsCount < len(l.tempVars) - 1 {
+		if writtenValsCount < len(l.tempVars)-1 {
 			l.sb.WriteString(",")
 		}
 		writtenValsCount++
@@ -407,7 +407,7 @@ func (l *RetroLog) writeVars() bool {
 	writtenVals := len(l.tempVars) > 0
 	for i, v := range l.tempVars {
 		l.sb.WriteString(v.varToStr())
-		if i < len(l.tempVars) - 1 {
+		if i < len(l.tempVars)-1 {
 			l.sb.WriteString(",")
 		}
 	}

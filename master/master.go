@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pigpaxos/pigpaxos"
+	"pigpaxos"
 )
 
 var port = flag.Int("port", 1735, "master port number")
