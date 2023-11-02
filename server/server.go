@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"pigpaxos/layerpaxos"
 	"sync"
 
 	"pigpaxos"
@@ -34,6 +35,9 @@ func replica(id paxi.ID) {
 
 	case "pigpaxos":
 		pigpaxos.NewReplica(id).Run()
+
+	case "layerpaxos":
+		layerpaxos.NewReplica(id).Run()
 
 	default:
 		panic("Unknown algorithm")

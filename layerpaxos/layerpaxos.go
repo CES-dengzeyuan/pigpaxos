@@ -1,19 +1,13 @@
-package paxos
+package layerpaxos
 
 import (
+	paxi "pigpaxos"
 	"pigpaxos/hlc"
 	"pigpaxos/log"
-	"strconv"
+	"pigpaxos/retro_log"
 	"sync"
 	"time"
-
-	"pigpaxos"
 )
-
-// this is the difference we allow between max seen slot and executed slot
-// if executed + ExecuteSlack < MaxSlot then we want try to recover the slots
-// as this is likely the case of state machine getting stuck because of network/communication failures
-const ExecuteSlack = 10
 
 // entry in log
 type entry struct {
@@ -26,27 +20,29 @@ type entry struct {
 }
 
 // Paxos instance
-type Paxos struct {
+type LayerPaxos struct {
 	paxi.Node
 
-	config []paxi.ID
-
-	log     map[int]*entry // log ordered by slot
-	execute int            // next execute slot number
-	active  bool           // active leader
-	ballot  paxi.Ballot    // highest ballot number
-	slot    int            // highest slot number
-
-	p3PendingBallot   paxi.Ballot
-	p3pendingSlots    []int
-	lastP3Time        int64
+	// log management variables
+	log               map[int]*entry // log ordered by slot
+	slot              int            // highest slot number
+	execute           int            // next execute slot number
 	lastCleanupMarker int
-	globalExecuted    int             // executed by all nodes. Need for log cleanup
+	globalExecute     int             // executed by all nodes. Need for log cleanup
 	executeByNode     map[paxi.ID]int // leader's knowledge of other nodes execute counter. Need for log cleanup
 
+	//Paxos management
+	active   bool            // active leader
+	ballot   paxi.Ballot     // highest ballot number
+	p1aTime  int64           // time P1a was sent
 	quorum   *paxi.Quorum    // phase 1 quorum
 	requests []*paxi.Request // phase 1 pending requests
 
+	p3PendingBallot paxi.Ballot
+	p3pendingSlots  []int
+	lastP3Time      int64
+
+	// Quorums
 	Q1              func(*paxi.Quorum) bool
 	Q2              func(*paxi.Quorum) bool
 	ReplyWhenCommit bool
@@ -58,21 +54,19 @@ type Paxos struct {
 }
 
 // NewPaxos creates new paxos instance
-func NewPaxos(n paxi.Node, options ...func(*Paxos)) *Paxos {
-	p := &Paxos{
+func NewLayerPaxos(n paxi.Node, options ...func(*LayerPaxos)) *LayerPaxos {
+	p := &LayerPaxos{
 		Node:            n,
 		log:             make(map[int]*entry, paxi.GetConfig().BufferSize),
 		slot:            -1,
 		quorum:          paxi.NewQuorum(),
 		requests:        make([]*paxi.Request, 0),
+		p3pendingSlots:  make([]int, 0, 100),
+		executeByNode:   make(map[paxi.ID]int, 0),
+		lastP3Time:      0,
 		Q1:              func(q *paxi.Quorum) bool { return q.Majority() },
 		Q2:              func(q *paxi.Quorum) bool { return q.Majority() },
 		ReplyWhenCommit: false,
-	}
-
-	p.executeByNode = make(map[paxi.ID]int)
-	for _, id := range paxi.GetConfig().IDs() {
-		p.executeByNode[id] = 0
 	}
 
 	for _, opt := range options {
@@ -82,87 +76,81 @@ func NewPaxos(n paxi.Node, options ...func(*Paxos)) *Paxos {
 	return p
 }
 
-// IsLeader indecates if this node is current leader
-func (p *Paxos) IsLeader() bool {
+// IsLeader indicates if this node is current leader
+func (p *LayerPaxos) IsLeader() bool {
 	return p.active || p.ballot.ID() == p.ID()
 }
 
-// Leader returns leader id of the current ballot
-func (p *Paxos) Leader() paxi.ID {
-	return p.ballot.ID()
-}
-
-// Ballot returns current ballot
-func (p *Paxos) Ballot() paxi.Ballot {
-	return p.ballot
-}
-
-// SetActive sets current paxos instance as active leader
-func (p *Paxos) SetActive(active bool) {
-	p.active = active
-}
-
-// SetBallot sets a new ballot number
-func (p *Paxos) SetBallot(b paxi.Ballot) {
-	p.ballot = b
-}
-
-// forceful sync of P3 messages if no progress was done in past 10 ms and no P3 msg was piggybacked
-func (p *Paxos) P3Sync(tnow int64) {
+func (p *LayerPaxos) CheckTimeout(timeout int64) {
 	p.logLck.RLock()
 	defer p.logLck.RUnlock()
-	log.Debugf("Syncing P3 (tnow=%d)", tnow)
+	execslot := p.execute
+	if p.active && execslot <= p.slot {
+		if e, ok := p.log[execslot]; ok && !e.commit {
+			if e.timestamp.UnixNano() < timeout {
+				log.Debugf("Retrying p2. entry_time = %d, retry time = %d", e.timestamp, timeout)
+				p.RetryP2a(execslot, e)
+			}
+		}
+	} else if !p.active && p.p1aTime < timeout {
+		log.Debugf("Retrying p1. p1time = %d, retry time = %d", p.p1aTime, timeout)
+		p.RetryP1a()
+	}
+
+	tnow := hlc.CurrentTimeInMS()
 	if tnow-10 > p.lastP3Time && p.lastP3Time > 0 && p.p3PendingBallot > 0 {
+		log.Debugf("Sending P3 on timeout: %v", p.p3PendingBallot)
 		p.p3Lock.Lock()
 		p.Broadcast(P3{
 			Ballot: p.p3PendingBallot,
 			Slot:   p.p3pendingSlots,
 		})
-		p.lastP3Time = tnow
+		p.lastP3Time = hlc.CurrentTimeInMS()
 		p.p3pendingSlots = make([]int, 0, 100)
 		p.p3Lock.Unlock()
 	}
 }
 
-func (p *Paxos) CheckNeedForRecovery() {
-	p.logLck.RLock()
-	defer p.logLck.RUnlock()
-	// check if we state machine appears stuck and needs to recover some slots due to missing P3s or P2bs or both
-	if p.execute+ExecuteSlack < p.slot {
-		recoverSlots := make([]int, 0)
-		for slot := p.execute; slot < p.slot-ExecuteSlack; slot++ {
-			e, exists := p.log[slot]
-			if !exists || !e.commit {
-				recoverSlots = append(recoverSlots, slot)
-			}
-		}
-		p.sendRecoverRequest(p.Ballot(), recoverSlots)
-	}
+// Leader returns leader id of the current ballot
+func (p *LayerPaxos) Leader() paxi.ID {
+	return p.ballot.ID()
 }
 
-func (p *Paxos) UpdateLastExecutedByNode(id paxi.ID, lastExecute int) {
+// Ballot returns current ballot
+func (p *LayerPaxos) Ballot() paxi.Ballot {
+	return p.ballot
+}
+
+// SetActive sets current paxos instance as active leader
+func (p *LayerPaxos) SetActive(active bool) {
+	p.active = active
+}
+
+// SetBallot sets a new ballot number
+func (p *LayerPaxos) SetBallot(b paxi.Ballot) {
+	p.ballot = b
+}
+
+func (p *LayerPaxos) UpdateLastExecuteByNode(id paxi.ID, lastExecute int) {
 	p.markerLock.Lock()
 	defer p.markerLock.Unlock()
 	p.executeByNode[id] = lastExecute
 }
 
-func (p *Paxos) GetGlobalExecuteMarker() int {
-	if p.IsLeader() {
-		marker := p.execute
-		for _, c := range p.executeByNode {
-			if c < marker {
-				marker = c
-			}
+func (p *LayerPaxos) GetSafeLogCleanupMarker() int {
+	marker := p.execute
+	for _, c := range p.executeByNode {
+		if c < marker {
+			marker = c
 		}
-		p.globalExecuted = marker
 	}
-	return p.globalExecuted
+	return marker
 }
 
-func (p *Paxos) CleanupLog() {
+func (p *LayerPaxos) CleanupLog() {
 	p.markerLock.Lock()
-	marker := p.GetGlobalExecuteMarker()
-	log.Debugf("Replica %v log cleanup. lastCleanupMarker: %d, safeCleanUpMarker: %d", p.ID(), p.lastCleanupMarker, marker)
+	marker := p.GetSafeLogCleanupMarker()
+	//log.Debugf("Replica %v log cleanup. lastCleanupMarker: %d, safeCleanUpMarker: %d", p.ID(), p.lastCleanupMarker, marker)
 	p.markerLock.Unlock()
 
 	p.logLck.Lock()
@@ -174,7 +162,7 @@ func (p *Paxos) CleanupLog() {
 }
 
 // HandleRequest handles request and start phase 1 or phase 2
-func (p *Paxos) HandleRequest(r paxi.Request) {
+func (p *LayerPaxos) HandleRequest(r paxi.Request) {
 	// log.Debugf("Replica %s received %v\n", p.ID(), r)
 	if !p.active {
 		p.requests = append(p.requests, &r)
@@ -188,21 +176,34 @@ func (p *Paxos) HandleRequest(r paxi.Request) {
 }
 
 // P1a starts phase 1 prepare
-func (p *Paxos) P1a() {
+func (p *LayerPaxos) P1a() {
+	log.Debugf("Node %v LayerPaxos P1a", p.ID())
 	if p.active {
 		return
 	}
 	p.ballot.Next(p.ID())
 	p.quorum.Reset()
 	p.quorum.ACK(p.ID())
+	p.p1aTime = time.Now().UnixNano()
+	p.Broadcast(P1a{Ballot: p.ballot})
+}
+
+func (p *LayerPaxos) RetryP1a() {
+	log.Debugf("Node %v LayerPaxos RetryP1a", p.ID())
+	// should be called from within a lock
+	if p.active {
+		return
+	}
+	p.quorum.Reset()
+	p.quorum.ACK(p.ID())
+	p.p1aTime = time.Now().UnixNano()
 	p.Broadcast(P1a{Ballot: p.ballot})
 }
 
 // P2a starts phase 2 accept
-func (p *Paxos) P2a(r *paxi.Request) {
+func (p *LayerPaxos) P2a(r *paxi.Request) {
+	log.Debugf("Node %v etering P2a with slot %d", p.ID(), p.slot)
 	p.logLck.Lock()
-	defer p.logLck.Unlock()
-
 	p.slot++
 	p.log[p.slot] = &entry{
 		ballot:    p.ballot,
@@ -213,12 +214,12 @@ func (p *Paxos) P2a(r *paxi.Request) {
 	}
 	p.log[p.slot].quorum.ACK(p.ID())
 	m := P2a{
-		Ballot:             p.ballot,
-		Slot:               p.slot,
-		GlobalExecutedSlot: p.globalExecuted,
-		Command:            r.Command,
+		Ballot:        p.ballot,
+		Slot:          p.slot,
+		Command:       r.Command,
+		GlobalExecute: p.globalExecute,
 	}
-
+	p.logLck.Unlock()
 	p.p3Lock.Lock()
 	if p.p3PendingBallot > 0 {
 		m.P3msg = P3{Ballot: p.p3PendingBallot, Slot: p.p3pendingSlots}
@@ -228,45 +229,59 @@ func (p *Paxos) P2a(r *paxi.Request) {
 	p.p3Lock.Unlock()
 
 	if paxi.GetConfig().Thrifty {
-		p.MulticastQuorum(paxi.GetConfig().N()/2+1, m)
+		go p.Broadcast(m) // TODO: implement thrifty
+	} else {
+		go p.Broadcast(m)
+	}
+	log.Debugf("Leaving P2a with slot %d", p.slot)
+}
+
+func (p *LayerPaxos) RetryP2a(slot int, e *entry) {
+	log.Debugf("Entering RetryP2a with slot %d", slot)
+	m := P2a{
+		Ballot:        p.ballot,
+		Slot:          slot,
+		Command:       e.command,
+		GlobalExecute: p.globalExecute,
+	}
+	if paxi.GetConfig().Thrifty {
+		p.Broadcast(m) // TODO: implement thrifty
 	} else {
 		p.Broadcast(m)
 	}
+	log.Debugf("Leaving RetryP2a with slot %d", p.slot)
 }
 
 // HandleP1a handles P1a message
-func (p *Paxos) HandleP1a(m P1a) {
+func (p *LayerPaxos) HandleP1a(m P1a, reply paxi.ID) {
 	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
 
 	// new leader
 	if m.Ballot > p.ballot {
 		p.ballot = m.Ballot
 		p.active = false
-		// TODO use BackOff time or forward
-		// forward pending requests to new leader
 		p.forward()
-		// if len(p.requests) > 0 {
-		// 	defer p.P1a()
-		// }
 	}
-	p.logLck.RLock()
-	defer p.logLck.RUnlock()
+
 	l := make(map[int]CommandBallot)
+	p.logLck.RLock()
 	for s := p.execute; s <= p.slot; s++ {
 		if p.log[s] == nil || p.log[s].commit {
 			continue
 		}
 		l[s] = CommandBallot{p.log[s].command, p.log[s].ballot}
 	}
+	p.logLck.RUnlock()
 
-	p.Send(m.Ballot.ID(), P1b{
+	p.Send(reply, P1b{
 		Ballot: p.ballot,
 		ID:     p.ID(),
 		Log:    l,
 	})
+	log.Debugf("Leaving HandleP1a")
 }
 
-func (p *Paxos) update(scb map[int]CommandBallot) {
+func (p *LayerPaxos) update(scb map[int]CommandBallot) {
 	p.logLck.Lock()
 	defer p.logLck.Unlock()
 	for s, cb := range scb {
@@ -287,14 +302,11 @@ func (p *Paxos) update(scb map[int]CommandBallot) {
 }
 
 // HandleP1b handles P1b message
-func (p *Paxos) HandleP1b(m P1b) {
+func (p *LayerPaxos) HandleP1b(m P1b) {
 	// old message
 	if m.Ballot < p.ballot || p.active {
-		// log.Debugf("Replica %s ignores old message [%v]\n", p.ID(), m)
 		return
 	}
-
-	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.ID, m, p.ID())
 
 	p.update(m.Log)
 
@@ -314,24 +326,23 @@ func (p *Paxos) HandleP1b(m P1b) {
 			p.active = true
 			p.p3PendingBallot = p.ballot
 			// propose any uncommitted entries
+			p.logLck.Lock()
 			for i := p.execute; i <= p.slot; i++ {
 				// TODO nil gap?
-				p.logLck.RLock()
-				logEntry := p.log[i]
-				p.logLck.RUnlock()
-				if logEntry == nil || logEntry.commit {
+				if p.log[i] == nil || p.log[i].commit {
 					continue
 				}
-				logEntry.ballot = p.ballot
-				logEntry.quorum = paxi.NewQuorum()
-				logEntry.quorum.ACK(p.ID())
+				p.log[i].ballot = p.ballot
+				p.log[i].quorum = paxi.NewQuorum()
+				p.log[i].quorum.ACK(p.ID())
 				p.Broadcast(P2a{
-					Ballot:             p.ballot,
-					Slot:               i,
-					GlobalExecutedSlot: p.globalExecuted,
-					Command:            logEntry.command,
+					Ballot:        p.ballot,
+					Slot:          i,
+					Command:       p.log[i].command,
+					GlobalExecute: p.globalExecute,
 				})
 			}
+			p.logLck.Unlock()
 			// propose new commands
 			for _, req := range p.requests {
 				p.P2a(req)
@@ -342,24 +353,23 @@ func (p *Paxos) HandleP1b(m P1b) {
 }
 
 // HandleP2a handles P2a message
-func (p *Paxos) HandleP2a(m P2a) {
+func (p *LayerPaxos) HandleP2a(m P2a, reply paxi.ID) {
 	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
 
 	if m.Ballot >= p.ballot {
 		p.ballot = m.Ballot
-		p.globalExecuted = m.GlobalExecutedSlot
 		p.active = false
+		p.globalExecute = m.GlobalExecute
+		p.logLck.Lock()
 		// update slot number
 		p.slot = paxi.Max(p.slot, m.Slot)
 		// update entry
-		p.logLck.Lock()
 		if e, exists := p.log[m.Slot]; exists {
 			if !e.commit && m.Ballot > e.ballot {
 				// different command and request is not nil
 				if !e.command.Equal(m.Command) && e.request != nil {
 					p.Forward(m.Ballot.ID(), *e.request)
 					// p.Retry(*e.request)
-					log.Debugf("Received different command (%v!=%v) for slot %d, resetting the request", m.Command, e.command, m.Slot)
 					e.request = nil
 				}
 				e.command = m.Command
@@ -379,34 +389,36 @@ func (p *Paxos) HandleP2a(m P2a) {
 		p.logLck.Unlock()
 	}
 
-	p.Send(m.Ballot.ID(), P2b{
-		Ballot:           p.ballot,
-		Slot:             m.Slot,
-		ID:               p.ID(),
-		LastExecutedSlot: p.execute,
+	idList := make([]paxi.ID, 1, 1)
+	idList[0] = p.ID()
+
+	p.Send(reply, P2b{
+		Ballot: p.ballot,
+		Slot:   m.Slot,
+		ID:     idList,
 	})
 
 	if len(m.P3msg.Slot) > 0 {
 		p.HandleP3(m.P3msg)
 	}
+
+	log.Debugf("Leaving HandleP2a")
 }
 
 // HandleP2b handles P2b message
-func (p *Paxos) HandleP2b(m P2b) {
+func (p *LayerPaxos) HandleP2b(msgSlot int, msgBallot paxi.Ballot, votedIds []paxi.ID) {
+	log.Debugf("Entering HandleP2b: ===[bal: %v, slot: %d, votes: %v]===>>> %s", msgBallot, msgSlot, votedIds, p.ID())
 	// old message
-
 	p.logLck.RLock()
-	entry, exist := p.log[m.Slot]
+	entry, exist := p.log[msgSlot]
 	p.logLck.RUnlock()
-	if !exist || m.Ballot < entry.ballot || entry.commit {
+	if !exist || msgBallot < entry.ballot || entry.commit {
 		return
 	}
-
-	p.UpdateLastExecutedByNode(m.ID, m.LastExecutedSlot)
 	// reject message
 	// node update its ballot number and falls back to acceptor
-	if m.Ballot > p.ballot {
-		p.ballot = m.Ballot
+	if msgBallot > p.ballot {
+		p.ballot = msgBallot
 		p.active = false
 		// send pending P3s we have for old ballot
 		p.p3Lock.Lock()
@@ -423,14 +435,21 @@ func (p *Paxos) HandleP2b(m P2b) {
 	// ack message
 	// the current slot might still be committed with q2
 	// if no q2 can be formed, this slot will be retried when received p2a or p3
-	if m.Ballot.ID() == p.ID() && m.Ballot == entry.ballot {
-		entry.quorum.ACK(m.ID)
+	if msgBallot.ID() == p.ID() && msgBallot == entry.ballot {
+		for _, id := range votedIds {
+			entry.quorum.ACK(id)
+		}
+
 		if p.Q2(entry.quorum) {
 			entry.commit = true
+			if paxi.GetConfig().UseRetroLog {
+				slotStruct := retro_log.NewRqlStruct(nil).AddVarInt32("slot", msgSlot).AddVarStr("hash", entry.command.Hash())
+				paxi.Retrolog.StartTx().AppendSetStruct("committed", slotStruct).AppendSetInt32("committed_slots", msgSlot).Commit()
+			}
 
 			p.p3Lock.Lock()
-			log.Debugf("Adding slot %d to P3Pending (%v)", m.Slot, p.p3pendingSlots)
-			p.p3pendingSlots = append(p.p3pendingSlots, m.Slot)
+			log.Debugf("Adding slot %d to P3Pending (%v)", msgSlot, p.p3pendingSlots)
+			p.p3pendingSlots = append(p.p3pendingSlots, msgSlot)
 			p.p3Lock.Unlock()
 
 			if p.ReplyWhenCommit {
@@ -444,14 +463,15 @@ func (p *Paxos) HandleP2b(m P2b) {
 			}
 		}
 	}
+	log.Debugf("Leaving HandleP2b. next execute slot = %d, next slot=%d", p.execute, p.slot)
 }
 
 // HandleP3 handles phase 3 commit message
-func (p *Paxos) HandleP3(m P3) {
-	log.Debugf("Replica %s HandleP3 {%v} from %v", p.ID(), m, m.Ballot.ID())
+func (p *LayerPaxos) HandleP3(m P3) {
+	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
 	for _, slot := range m.Slot {
-		p.slot = paxi.Max(p.slot, slot)
 		p.logLck.Lock()
+		p.slot = paxi.Max(p.slot, slot)
 		e, exist := p.log[slot]
 		if exist {
 			if e.ballot == m.Ballot {
@@ -461,18 +481,20 @@ func (p *Paxos) HandleP3(m P3) {
 				p.Forward(m.Ballot.ID(), *e.request)
 				e.request = nil
 				// ask to recover the slot
-				log.Debugf("Replica %s needs to recover slot %d on ballot %v", p.ID(), slot, m.Ballot)
-				recoverSlots := []int{slot}
-				p.sendRecoverRequest(m.Ballot, recoverSlots)
+				log.Debugf("Replica %s needs to recover slot %d on ballot %v (we have cmd %v)", p.ID(), slot, m.Ballot, e.command)
+				p.sendRecoverRequest(m.Ballot, slot)
 			}
 
 		} else {
-			// we mark slot as committed, but set ballot to 0 to designate that we have not received P2a for the slot and may need to recover later
 			e = &entry{commit: true, ballot: 0}
 			p.log[slot] = e
 		}
 		p.logLck.Unlock()
 
+		if paxi.GetConfig().UseRetroLog {
+			slotStruct := retro_log.NewRqlStruct(nil).AddVarInt32("slot", slot).AddVarStr("hash", e.command.Hash())
+			paxi.Retrolog.StartTx().AppendSetStruct("committed", slotStruct).AppendSetInt32("committed_slots", slot).Commit()
+		}
 		if p.ReplyWhenCommit {
 			if e.request != nil {
 				e.request.Reply(paxi.Reply{
@@ -483,110 +505,66 @@ func (p *Paxos) HandleP3(m P3) {
 		}
 	}
 	p.exec()
-	//log.Debugf("Leaving HandleP3")
+	log.Debugf("Leaving HandleP3")
 }
 
-// HandleP3 handles phase 3 commit message
-/*func (p *Paxos) HandleP3(m P3) {
-	// log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
-
-	p.slot = paxi.Max(p.slot, m.Slot)
-
-	e, exist := p.log[m.Slot]
-	if exist {
-		if !e.command.Equal(m.Command) && e.request != nil {
-			// p.Retry(*e.request)
-			p.Forward(m.Ballot.ID(), *e.request)
-			e.request = nil
-		}
-	} else {
-		p.log[m.Slot] = &entry{}
-		e = p.log[m.Slot]
-	}
-
-	e.command = m.Command
-	e.commit = true
-
-	if p.ReplyWhenCommit {
-		if e.request != nil {
-			e.request.Reply(paxi.Reply{
-				Command:   e.request.Command,
-				Timestamp: e.request.Timestamp,
-			})
-		}
-	} else {
-		p.exec()
-	}
-}*/
-
-func (p *Paxos) sendRecoverRequest(ballot paxi.Ballot, slots []int) {
+func (p *LayerPaxos) sendRecoverRequest(ballot paxi.Ballot, slot int) {
 	p.Send(ballot.ID(), P3RecoverRequest{
 		Ballot: ballot,
-		Slots:  slots,
+		Slot:   slot,
 		NodeId: p.ID(),
 	})
 }
 
 // HandleP3RecoverRequest handles slot recovery request at leader
-func (p *Paxos) HandleP3RecoverRequest(m P3RecoverRequest) {
+func (p *LayerPaxos) HandleP3RecoverRequest(m P3RecoverRequest) {
 	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.NodeId, m, p.ID())
 	p.logLck.Lock()
-
-	slotsToRecover := make([]int, 0, len(m.Slots))
-	cmdsToRecover := make([]paxi.Command, 0, len(m.Slots))
-	for _, slot := range m.Slots {
-		e, exist := p.log[slot]
-		if exist && e.commit {
-			log.Debugf("Entry on slot %d for recover: %v", slot, e)
-			slotsToRecover = append(slotsToRecover, slot)
-			cmdsToRecover = append(cmdsToRecover, e.command)
-		} else {
-			log.Debugf("Entry for recovery on slot %d does not exist or uncommitted", slot)
-		}
-	}
+	e, exist := p.log[m.Slot]
 	p.logLck.Unlock()
+	if exist && e.commit {
+		// ok to recover
+		p.Send(m.NodeId, P3RecoverReply{
+			Ballot:  e.ballot,
+			Slot:    m.Slot,
+			Command: e.command,
+		})
+	}
 
-	// ok to recover
-	log.Debugf("Node %v sends recovery on slots %d to node %v", p.ID(), slotsToRecover, m.NodeId)
-	p.Send(m.NodeId, P3RecoverReply{
-		Ballot:   p.ballot, // TODO: this technically needs to be a list of ballots for each slot, but I think there is no harm to make recovered slots with a higher or same ballot than the original
-		Slots:    slotsToRecover,
-		Commands: cmdsToRecover,
-	})
-
+	p.exec()
 	log.Debugf("Leaving HandleP3RecoverRequest")
 }
 
 // HandleP3RecoverReply handles slot recovery
-func (p *Paxos) HandleP3RecoverReply(m P3RecoverReply) {
-	log.Debugf("[%v]===>>> Replica %s\n", m, p.ID())
+func (p *LayerPaxos) HandleP3RecoverReply(m P3RecoverReply) {
+	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
 	p.logLck.Lock()
-
-	for i, slot := range m.Slots {
-		p.slot = paxi.Max(p.slot, slot)
-
-		// overwrite the slot with one we recovered, as it is guaranteed to have been majority committed
-		p.log[slot] = &entry{
-			ballot:    m.Ballot,
-			command:   m.Commands[i],
-			commit:    true,
-			timestamp: time.Now(),
-		}
+	p.slot = paxi.Max(p.slot, m.Slot)
+	e, exist := p.log[m.Slot]
+	if exist {
+		e.command = m.Command
+		e.ballot = m.Ballot
+		e.commit = true
 	}
-
 	p.logLck.Unlock()
 
 	p.exec()
 	log.Debugf("Leaving HandleP3RecoverReply")
 }
 
-func (p *Paxos) exec() {
+func (p *LayerPaxos) exec() {
+	log.Debugf("Entering exec. exec slot=%d", p.execute)
 	p.logLck.Lock()
 	defer p.logLck.Unlock()
 	for {
-		e, exists := p.log[p.execute]
+		e, ok := p.log[p.execute]
+		if ok && p.execute+10 < p.slot && e.commit && e.ballot == 0 {
+			// ask to recover the slot
+			log.Debugf("Replica %s tries to recover slot %d on ballot %v", p.ID(), p.execute, p.Ballot())
+			p.sendRecoverRequest(p.Ballot(), p.execute)
+		}
 
-		if !exists || !e.commit {
+		if !ok || !e.commit || (e.commit && e.ballot == 0) {
 			break
 		}
 		log.Debugf("Replica %s execute [s=%d, cmd=%v]", p.ID(), p.execute, e.command)
@@ -597,20 +575,15 @@ func (p *Paxos) exec() {
 				Value:      value,
 				Properties: make(map[string]string),
 			}
-			reply.Properties[HTTPHeaderSlot] = strconv.Itoa(p.execute)
-			reply.Properties[HTTPHeaderBallot] = e.ballot.String()
-			reply.Properties[HTTPHeaderExecute] = strconv.Itoa(p.execute)
-			e.request.Reply(reply)
+			go e.request.Reply(reply)
 			e.request = nil
 		}
-		// TODO clean up the log periodically
-		// delete(p.log, p.execute)
 		p.execute++
 	}
 	log.Debugf("Leaving exec")
 }
 
-func (p *Paxos) forward() {
+func (p *LayerPaxos) forward() {
 	for _, m := range p.requests {
 		p.Forward(p.ballot.ID(), *m)
 	}

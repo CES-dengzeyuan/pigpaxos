@@ -4,6 +4,7 @@ import (
 	"flag"
 	"pigpaxos"
 	"pigpaxos/lib"
+	"pigpaxos/log"
 )
 
 var replyWhenCommit = flag.Bool("ReplyWhenCommit", false, "Reply to client when request is committed, instead of executed")
@@ -36,11 +37,11 @@ func NewReplica(id paxi.ID) *Replica {
 		graph:        lib.NewGraph(),
 	}
 	for id := range paxi.GetConfig().Addrs {
-		r.log[id] = make(map[int]*instance, paxi.GetConfig().BufferSize*10000)
+		r.log[id] = make(map[int]*instance, paxi.GetConfig().BufferSize)
 		r.slot[id] = -1
 		r.committed[id] = -1
 		r.executed[id] = -1
-		r.conflicts[id] = make(map[paxi.Key]int, paxi.GetConfig().BufferSize*1000)
+		r.conflicts[id] = make(map[paxi.Key]int, paxi.GetConfig().BufferSize)
 	}
 
 	r.Register(paxi.Request{}, r.handleRequest)
@@ -136,11 +137,10 @@ func (r *Replica) handleRequest(m paxi.Request) {
 		Seq:     seq,
 		Dep:     r.log[id][s].copyDep(),
 	})
-	//log.Infof("Pre Accept Dep size: %d ", len(r.log[id][s].copyDep()))
 }
 
 func (r *Replica) handlePreAccept(m PreAccept) {
-	//log.Debugf("Replica %s receives PreAccept %+v", r.ID(), m)
+	log.Debugf("Replica %s receives PreAccept %+v", r.ID(), m)
 	id := m.Replica
 	s := m.Slot
 	i := r.log[id][s]
@@ -186,12 +186,10 @@ func (r *Replica) handlePreAccept(m PreAccept) {
 		Dep:       i.copyDep(),
 		Committed: c,
 	})
-
-	//log.Infof("Dep size: %d | committed size: %d ", len(i.copyDep()), len(c))
 }
 
 func (r *Replica) handlePreAcceptReply(m PreAcceptReply) {
-	//log.Debugf("Replica %s receives PreAcceptReply %+v", r.ID(), m)
+	log.Debugf("Replica %s receives PreAcceptReply %+v", r.ID(), m)
 	i := r.log[r.ID()][m.Slot]
 	if i.status != PREACCEPTED {
 		return
@@ -220,7 +218,7 @@ func (r *Replica) handlePreAcceptReply(m PreAcceptReply) {
 		if !i.changed && committed {
 			// fast path
 			r.fast++
-			//log.Debugf("Replica %s number of fast instance: %d", r.ID(), r.fast)
+			log.Debugf("Replica %s number of fast instance: %d", r.ID(), r.fast)
 			i.status = COMMITTED
 			r.updateCommit(r.ID())
 			r.Broadcast(Commit{
@@ -239,7 +237,7 @@ func (r *Replica) handlePreAcceptReply(m PreAcceptReply) {
 		} else {
 			// slow path
 			r.slow++
-			//log.Debugf("Replica %s number of slow instance: %d", r.ID(), r.slow)
+			log.Debugf("Replica %s number of slow instance: %d", r.ID(), r.slow)
 			i.status = ACCEPTED
 			// reset quorum for accept message
 			i.quorum.Reset()
@@ -257,7 +255,7 @@ func (r *Replica) handlePreAcceptReply(m PreAcceptReply) {
 }
 
 func (r *Replica) handleAccept(m Accept) {
-	//log.Debugf("Replica %s receives Accept %+v", r.ID(), m)
+	log.Debugf("Replica %s receives Accept %+v", r.ID(), m)
 	id := m.Replica
 	s := m.Slot
 	i := r.log[id][s]
@@ -290,7 +288,7 @@ func (r *Replica) handleAccept(m Accept) {
 }
 
 func (r *Replica) handleAcceptReply(m AcceptReply) {
-	//log.Debugf("Replica %s receives AcceptReply %+v", r.ID(), m)
+	log.Debugf("Replica %s receives AcceptReply %+v", r.ID(), m)
 	i := r.log[r.ID()][m.Slot]
 
 	if i.status != ACCEPTED {
@@ -324,7 +322,7 @@ func (r *Replica) handleAcceptReply(m AcceptReply) {
 }
 
 func (r *Replica) handleCommit(m Commit) {
-	//log.Debugf("Replica %s receives Commit %+v", r.ID(), m)
+	log.Debugf("Replica %s receives Commit %+v", r.ID(), m)
 	i := r.log[m.Replica][m.Slot]
 
 	if m.Slot > r.slot[m.Replica] {
@@ -354,9 +352,9 @@ func (r *Replica) handleCommit(m Commit) {
 }
 
 func (r *Replica) execute() {
-	for id, l := range r.log {
+	for id, log := range r.log {
 		for s := r.executed[id] + 1; s <= r.slot[id]; s++ {
-			i := l[s]
+			i := log[s]
 			if i == nil {
 				continue
 			}
@@ -384,5 +382,32 @@ func (r *Replica) execute() {
 }
 
 func (r *Replica) execute2() {
-
+	for id, log := range r.log {
+		for s := r.executed[id] + 1; s <= r.slot[id]; s++ {
+			i := log[s]
+			if i == nil {
+				continue
+			}
+			if i.status == EXECUTED {
+				if s == r.executed[id]+1 {
+					r.executed[id] = s
+				}
+				continue
+			}
+			if i.status != COMMITTED {
+				continue
+			}
+			v := r.Execute(i.cmd)
+			if i.request != nil {
+				i.request.Reply(paxi.Reply{
+					Command: i.cmd,
+					Value:   v,
+				})
+				i.request = nil
+			}
+			if s == r.executed[id]+1 {
+				r.executed[id] = s
+			}
+		}
+	}
 }
