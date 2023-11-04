@@ -12,9 +12,9 @@ def read_config(file_path):
 
 def get_extra_args(algorithm, pg, fr):
     if algorithm == "pigpaxos":
-        return f"-pg {pg} -fr {str(fr).lower()}"
+        return f"-pg {pg} -fr {str(fr).lower()} "
     elif algorithm == "layerpaxos":
-        return f"-npg {pg} -wfr {str(fr).lower()}"
+        return f"-npg {pg} -wfr {str(fr).lower()} "
     else:
         return ""
 
@@ -24,10 +24,12 @@ def start_service(server_info, algorithm, log_dir, extra_args):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         ssh.connect(server_info['ip'],
-                    port=22,
+                    port=server_info['port'],
                     username=server_info['username'],
                     password=server_info['password'])
-        cmd = f"./server -id {server_info['id']} -algorithm={algorithm} -log_dir {log_dir} {extra_args} &"
+        cmd = f"cd /root/pigpaxos/bin; mkdir {log_dir}"
+        ssh.exec_command(cmd)
+        cmd = f"cd /root/pigpaxos/bin; ./server -id {server_info['id']} -log_dir {log_dir} -algorithm={algorithm} {extra_args}&"
         ssh.exec_command(cmd)
     finally:
         ssh.close()
@@ -68,7 +70,7 @@ def start_local_processes(log_dir, config_path, slpconf):
 
 if __name__ == "__main__":
     config_path = 'config.json'
-    algorithm = "pigpaxos"
+    algorithm = "paxos"
     pg = 1
     fr = True
     username = "root"
@@ -86,7 +88,7 @@ if __name__ == "__main__":
         server_info = {
             'id': server_id,
             'ip': hostIP,
-            'port': int(port),
+            'port': 22,
             'username': username,
             'password': passwd,
         }
