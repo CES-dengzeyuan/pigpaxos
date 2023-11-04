@@ -24,7 +24,7 @@ def start_service(server_info, algorithm, log_dir, extra_args):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         ssh.connect(server_info['ip'],
-                    port=server_info['port'],
+                    port=22,
                     username=server_info['username'],
                     password=server_info['password'])
         cmd = f"./server -id {server_info['id']} -algorithm={algorithm} -log_dir {log_dir} {extra_args} &"
