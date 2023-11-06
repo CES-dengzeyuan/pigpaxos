@@ -42,7 +42,7 @@ type Benchmark struct {
 
 func main() {
 	ipList := []string{
-		"202.199.13.86", "202.189.45.14", "202.199.15.47", // Add more IPs as needed
+		"202.199.13.86", "202.189.45.14", "202.199.15.47", "202.199.13.86", "202.189.45.14", "202.199.15.47", "202.199.13.86", "202.189.45.14", "202.199.15.47", // Add more IPs as needed
 	}
 	config := Config{
 		Address:        make(map[string]string),
@@ -55,13 +55,29 @@ func main() {
 		Multiversion:   false,
 		UseRetroLog:    false,
 		Benchmark: Benchmark{
-			T: 2,
-			// ... Add the rest of the benchmark settings
+			T:                    60,
+			N:                    0,
+			K:                    1000,
+			W:                    0.5,
+			Throttle:             0,
+			Concurrency:          1,
+			Distribution:         "conflict",
+			LinearizabilityCheck: false,
+			Conflicts:            0,
+			Min:                  0,
+			Mu:                   500,
+			Sigma:                50,
+			Move:                 false,
+			Speed:                10,
+			ZipfianS:             2,
+			ZipfianV:             1,
+			Lambda:               0.01,
+			Size:                 8,
 		},
 	}
 
 	tcpPort := 1735
-	httpPort := 8080
+	httpPort := 8081
 
 	// Generate the address and http_address based on ipList
 	for i, ip := range ipList {
@@ -70,8 +86,8 @@ func main() {
 		config.HttpAddress[key] = fmt.Sprintf("http://%s:%d", ip, httpPort)
 
 		// Increment ports for next IP
-		tcpPort++
-		httpPort++
+		//tcpPort++
+		//httpPort++
 	}
 
 	// Serialize config to JSON
@@ -81,7 +97,7 @@ func main() {
 	}
 
 	// Write JSON to file
-	err = os.WriteFile("bin/myconfig.json", file, 0644)
+	err = os.WriteFile("bin/config1.json", file, 0644)
 	if err != nil {
 		panic(err)
 	}
