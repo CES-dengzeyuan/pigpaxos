@@ -38,6 +38,8 @@ func NewReplica(id paxi.ID) *Replica {
 	r.Register(P2a{}, r.HandleP2a)
 	r.Register(P2b{}, r.HandleP2b)
 	r.Register(P3{}, r.HandleP3)
+	r.Register(P3RecoverRequest{}, r.HandleP3RecoverRequest)
+	r.Register(P3RecoverReply{}, r.HandleP3RecoverReply)
 
 	go r.startTicker()
 

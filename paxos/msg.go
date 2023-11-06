@@ -13,6 +13,8 @@ func init() {
 	gob.Register(P2a{})
 	gob.Register(P2b{})
 	gob.Register(P3{})
+	gob.Register(P3RecoverRequest{})
+	gob.Register(P3RecoverReply{})
 }
 
 // P1a prepare message
