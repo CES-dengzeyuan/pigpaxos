@@ -42,7 +42,15 @@ type Benchmark struct {
 
 func main() {
 	ipList := []string{
-		"202.199.13.86", "202.189.45.14", "202.199.15.47", "202.199.13.86", "202.189.45.14", "202.199.15.47", "202.199.13.86", "202.189.45.14", "202.199.15.47", // Add more IPs as needed
+		"172.19.80.244",
+		"172.19.80.245",
+		"172.19.80.246",
+		"172.19.80.247",
+		"172.19.80.248",
+		"172.19.80.249",
+		"172.19.80.250",
+		"172.19.80.251",
+		"172.19.80.252",
 	}
 	config := Config{
 		Address:        make(map[string]string),
@@ -97,7 +105,7 @@ func main() {
 	}
 
 	// Write JSON to file
-	err = os.WriteFile("bin/config1.json", file, 0644)
+	err = os.WriteFile("bin/config.json", file, 0644)
 	if err != nil {
 		panic(err)
 	}
