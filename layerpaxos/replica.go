@@ -511,6 +511,7 @@ func (r *Replica) readyToRelayP1b(ballot paxi.Ballot, depth uint8) bool {
 		}
 	}
 	return false
+	//return true
 }
 
 //***************
