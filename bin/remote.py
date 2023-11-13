@@ -31,7 +31,7 @@ def start_service(server_info, log_dir, extra_args):
                     password=server_info['password'])
         cmd = f"cd /root/pigpaxos/bin; mkdir {log_dir}"
         ssh.exec_command(cmd)
-        cmd = f"cd /root/pigpaxos/bin; ./server -id {server_info['id']} -log_dir {log_dir} {extra_args}&"
+        cmd = f"cd /root/pigpaxos/bin; ./server -id {server_info['id']} -log_dir {log_dir} -log_level=info {extra_args}&"
         ssh.exec_command(cmd)
     finally:
         ssh.close()
@@ -63,7 +63,7 @@ def start_local_processes(log_dir, config_path, slpconf):
     print(monitor_cmd)
     subprocess.Popen(monitor_cmd, shell=True)
 
-    client_cmd = f"./client -id 1.1 -log_dir {log_dir} -config {config_path}"
+    client_cmd = f"./client -id 1.1 -log_dir {log_dir} -log_level=info -config {config_path}"
     client_process = subprocess.Popen(client_cmd, shell=True)
     client_process.wait()
 
