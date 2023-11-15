@@ -64,7 +64,7 @@ func main() {
 		if i == 0 {
 			continue
 		}
-		publicIP := record[9]
+		publicIP := record[8]
 		ipList = append(ipList, publicIP)
 	}
 

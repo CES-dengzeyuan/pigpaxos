@@ -577,11 +577,13 @@ func (r *Replica) handleP2bRelay(m P2b) {
 			log.Debugf("Now have %d messages to relay for p2b Slot %d Ballot %v", len(p2b.ID), m.Slot, m.Ballot)
 			if r.readyToRelayP2b(m.Slot) {
 				var missingIds []paxi.ID
-				if r.relaySlack > 0 {
-					missingIds = r.computeMissingIDsForP2b(p2b)
-				} else {
-					missingIds = make([]paxi.ID, 0)
-				}
+				//if r.relaySlack > 0 {
+				//	missingIds = r.computeMissingIDsForP2b(p2b)
+				//} else {
+				//	missingIds = make([]paxi.ID, 0)
+				//}
+				//执行过程先进行relay下的选票收集，后计算需要跳过的节点
+				missingIds = r.computeMissingIDsForP2b(p2b)
 				log.Debugf("Relaying p2bs {%v} to %v", p2bForRelay, m.Ballot.ID())
 				// relay RoutedMsg downstream unless relaying back to root
 				if p2bForRelay.Progress == 0 {

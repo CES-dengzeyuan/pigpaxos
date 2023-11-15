@@ -617,7 +617,6 @@ func (r *Replica) handleP2bRelay(m P2b) {
 }
 
 func (r *Replica) computeMissingIDsForP2b(p2b P2b) []paxi.ID {
-	//take a copy of this group
 	missingIds := make([]paxi.ID, len(r.relayGroups[r.myRelayGroup].nodes))
 	copy(missingIds, r.relayGroups[r.myRelayGroup].nodes)
 	for _, id := range p2b.ID {
