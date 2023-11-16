@@ -64,7 +64,7 @@ func main() {
 		if i == 0 {
 			continue
 		}
-		publicIP := record[8]
+		publicIP := record[14]
 		ipList = append(ipList, publicIP)
 	}
 
@@ -107,8 +107,8 @@ func main() {
 		key := fmt.Sprintf("1.%d", i+1) // Generate key based on index: "1", "2", "3", ...
 		config.Address[key] = fmt.Sprintf("tcp://%s:%d", ip, tcpPort)
 		config.HttpAddress[key] = fmt.Sprintf("http://%s:%d", ip, httpPort)
-		//tcpPort++
-		//httpPort++
+		tcpPort++
+		httpPort++
 	}
 
 	jsonData, err := json.MarshalIndent(config, "", "    ")
