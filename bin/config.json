@@ -1,25 +1,25 @@
 {
     "address": {
-        "1.1": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.229]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.2": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.228]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.3": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.227]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.4": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.224]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.5": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.221]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.6": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.225]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.7": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.222]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.8": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.223]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735",
-        "1.9": "tcp://{PrivateIpAddress={IpAddress=[172.19.112.220]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:1735"
+        "1.1": "tcp://172.19.112.229:1735",
+        "1.2": "tcp://172.19.112.228:1735",
+        "1.3": "tcp://172.19.112.227:1735",
+        "1.4": "tcp://172.19.112.224:1735",
+        "1.5": "tcp://172.19.112.221:1735",
+        "1.6": "tcp://172.19.112.225:1735",
+        "1.7": "tcp://172.19.112.222:1735",
+        "1.8": "tcp://172.19.112.223:1735",
+        "1.9": "tcp://172.19.112.220:1735"
     },
     "http_address": {
-        "1.1": "http://{PrivateIpAddress={IpAddress=[172.19.112.229]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.2": "http://{PrivateIpAddress={IpAddress=[172.19.112.228]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.3": "http://{PrivateIpAddress={IpAddress=[172.19.112.227]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.4": "http://{PrivateIpAddress={IpAddress=[172.19.112.224]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.5": "http://{PrivateIpAddress={IpAddress=[172.19.112.221]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.6": "http://{PrivateIpAddress={IpAddress=[172.19.112.225]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.7": "http://{PrivateIpAddress={IpAddress=[172.19.112.222]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.8": "http://{PrivateIpAddress={IpAddress=[172.19.112.223]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081",
-        "1.9": "http://{PrivateIpAddress={IpAddress=[172.19.112.220]}, VpcId=vpc-wz9jr5vszdbbk2cxcfspk, VSwitchId=vsw-wz9sp6z5eeybmp2yee2zi, NatIpAddress=}:8081"
+        "1.1": "http://172.19.112.229:8081",
+        "1.2": "http://172.19.112.228:8081",
+        "1.3": "http://172.19.112.227:8081",
+        "1.4": "http://172.19.112.224:8081",
+        "1.5": "http://172.19.112.221:8081",
+        "1.6": "http://172.19.112.225:8081",
+        "1.7": "http://172.19.112.222:8081",
+        "1.8": "http://172.19.112.223:8081",
+        "1.9": "http://172.19.112.220:8081"
     },
     "policy": "majority",
     "threshold": 3,
