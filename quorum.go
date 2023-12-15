@@ -61,6 +61,10 @@ func (q *Quorum) Majority() bool {
 	return q.size > config.n/2
 }
 
+func (q *Quorum) LayerMajority() bool {
+	return q.size > config.n/4
+}
+
 // FastQuorum from fast paxos
 func (q *Quorum) FastQuorum() bool {
 	return q.size >= config.n*3/4

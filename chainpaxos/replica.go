@@ -1,4 +1,4 @@
-package pigpaxos
+package chainpaxos
 
 import (
 	"flag"
@@ -14,13 +14,13 @@ import (
 const GrayTimeoutMultiplier = 1000
 const TickerDuration = 10
 
-var stableLeader = flag.Bool("ephemeral", false, "stable leader, if true paxos forward request to current leader")
-var pg = flag.Int("pg", 2, "Number of peer-groups. Default is 2")
-var regionPeerGroups = flag.Bool("rpg", false, "use region as a peer group instead")
-var useSmallP2b = flag.Bool("smallp2b", true, "use small p2b aggregated message that put missing IDs instead of voted ids")
-var stdPigTimeout = flag.Int("stdpigtimeout", 50, "Standard timeout after which all non-collected responses are treated as failures")
-var rgSlack = flag.Int("rgslack", 0, "Slack for Relay group waiting. Ignoring this many slowest nodes")
-var fixedrelay = flag.Bool("fr", false, "Use static relay nodes that do not randomly change")
+var stableLeader = flag.Bool("csl", true, "stable leader, if true paxos forward request to current leader")
+var pg = flag.Int("cpg", 1, "Number of peer-groups. Default is 2")
+var regionPeerGroups = flag.Bool("crpg", false, "use region as a peer group instead")
+var useSmallP2b = flag.Bool("csmallp2b", true, "use small p2b aggregated message that put missing IDs instead of voted ids")
+var stdPigTimeout = flag.Int("cstdpigtimeout", 50, "Standard timeout after which all non-collected responses are treated as failures")
+var rgSlack = flag.Int("crgslack", 0, "Slack for Relay group waiting. Ignoring this many slowest nodes")
+var fixedrelay = flag.Bool("cfr", true, "Use static relay nodes that do not randomly change")
 
 type BalSlot struct {
 	paxi.Ballot
@@ -50,10 +50,10 @@ func (pg PeerGroup) String() string {
 	return fmt.Sprintf("PeerGroup {nodes=%v}", pg.nodes)
 }
 
-// Replica for one PigPaxos instance
+// Replica for one ChainPaxos instance
 type Replica struct {
 	paxi.Node
-	*PigPaxos
+	*ChainPaxos
 	relayGroups       []*PeerGroup
 	fixedRelays       []paxi.ID
 	myRelayGroup      int
@@ -78,10 +78,10 @@ type Replica struct {
 
 // NewReplica generates new Paxos replica
 func NewReplica(id paxi.ID) *Replica {
-	log.Debugf("PigPaxos Starting replica %v", id)
+	log.Debugf("ChainPaxos Starting replica %v", id)
 	r := new(Replica)
 	r.Node = paxi.NewNode(id)
-	r.PigPaxos = NewPigPaxos(r)
+	r.ChainPaxos = NewChainPaxos(r)
 	r.Register(paxi.Request{}, r.handleRequest)
 	r.Register(P1b{}, r.handleP1b)
 	r.Register([]P1b{}, r.handleP1bLeader)
@@ -119,7 +119,7 @@ func NewReplica(id paxi.ID) *Replica {
 	if !*regionPeerGroups {
 		r.numRelayGroups = *pg
 		r.relayGroups = r.peersToGroups(*pg, knownIDs)
-		log.Infof("PigPaxos computed PeerGroups: {%v}", r.relayGroups)
+		log.Infof("ChainPaxos computed PeerGroups: {%v}", r.relayGroups)
 	} else {
 		r.numRelayGroups = paxi.GetConfig().Z()
 		r.relayGroups = make([]*PeerGroup, r.numRelayGroups)
@@ -132,7 +132,7 @@ func NewReplica(id paxi.ID) *Replica {
 			r.relayGroups[pgNum].nodes = append(r.relayGroups[pgNum].nodes, id)
 		}
 
-		log.Infof("PigPaxos region computed PeerGroups: {%v}", r.relayGroups)
+		log.Infof("ChainPaxos region computed PeerGroups: {%v}", r.relayGroups)
 	}
 
 	r.fixedRelays = make([]paxi.ID, r.numRelayGroups)
@@ -146,7 +146,7 @@ func NewReplica(id paxi.ID) *Replica {
 		}
 	}
 
-	log.Infof("PigPaxos region NodeIdsToPeerGroups: {%v}", r.NodeIdsToGroup)
+	log.Infof("ChainPaxos region NodeIdsToPeerGroups: {%v}", r.NodeIdsToGroup)
 
 	go r.startTicker()
 
@@ -261,7 +261,7 @@ func (r *Replica) startTicker() {
 
 // Overrides Broadcast in node
 func (r *Replica) Broadcast(m interface{}) {
-	log.Debugf("PigPaxos Broadcast Msg: {%v}", m)
+	log.Debugf("ChainPaxos Broadcast Msg: {%v}", m)
 	routedMsg := RoutedMsg{
 		Hops:      make([]paxi.ID, 1),
 		IsForward: true,
@@ -285,8 +285,7 @@ func (r *Replica) Broadcast(m interface{}) {
 
 // special broadcast for messages within the peer group
 func (r *Replica) BroadcastToPeerGroup(pg *PeerGroup, originalSourceToExclude paxi.ID, m RoutedMsg) {
-	log.Debugf("PigPaxos Broadcast to PeerGroup %v: {%v}", pg, m)
-	log.Debugf("node %v,PeerGroup: %v ,exclude %v", r.ID(), pg, originalSourceToExclude)
+	log.Debugf("ChainPaxos Broadcast to PeerGroup %v: {%v}", pg, m)
 	for _, id := range pg.nodes {
 		r.GrayLock.RLock()
 		_, gray := r.GrayNodes[id]
@@ -297,9 +296,29 @@ func (r *Replica) BroadcastToPeerGroup(pg *PeerGroup, originalSourceToExclude pa
 	}
 }
 
+func (r *Replica) SendToChainHead(pg *PeerGroup, originalSourceToExclude paxi.ID, m RoutedMsg) {
+	log.Debugf("PeerGroup: %v ,exclude %v", pg, originalSourceToExclude)
+	// NodeIdsToPeerGroups: {map[1.1:0 1.2:0 1.3:0 1.4:0 1.5:1 1.6:1 1.7:1 1.8:1 1.9:1]}
+	// node 1.4,PeerGroup: PeerGroup {nodes=[1.1 1.2 1.3 1.4]} ,exclude 1.1
+	// node 1.9,PeerGroup: PeerGroup {nodes=[1.5 1.6 1.7 1.8 1.9]} ,exclude 1.1
+	// log.Debugf("PeerGroup: %v ,exclude %v", pg, originalSourceToExclude)
+	for _, id := range pg.nodes {
+		if id != r.ID() && id != originalSourceToExclude {
+			log.Debugf("Relay node %v send msg {%v} to %v", r.ID(), m, id)
+			go r.Send(id, m)
+			break
+		}
+	}
+}
+
+func (r *Replica) SendAmongPeer(pg *PeerGroup, nodeToExclude []paxi.ID, m RoutedMsg) {
+	log.Debugf("")
+
+}
+
 func (r *Replica) Send(to paxi.ID, m interface{}) error {
 	if to == r.ID() {
-		log.Debugf("PigPaxos Self Send loop on Msg: {%v}", m)
+		log.Debugf("ChainPaxos Self Send loop on Msg: {%v}", m)
 		r.HandleMsg(m) // loopback for self
 	} else {
 		err := r.Node.Send(to, m)
@@ -339,13 +358,23 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 		}
 
 		// forward propagation if needed
+		// 假设chainPaxos的maxdepth为2
 		if m.Progress+1 < r.maxDepth && needToPropagate {
 			// still not done going to the leaf nodes
 			m.Progress += 1
 			pgToBroadcast := r.relayGroups[r.myRelayGroup]
 			m.Hops = append(m.Hops, r.ID())
 			log.Debugf("Node %v forward propagating msg %v at depth %d and max depth %d", r.ID(), m, m.Progress, r.maxDepth)
-			r.BroadcastToPeerGroup(pgToBroadcast, m.GetPreviousProgressHop(), m)
+
+			// 有没有必要将P1a和P2a分开？
+			switch m.Payload.(type) {
+			case P1a:
+				r.BroadcastToPeerGroup(pgToBroadcast, m.GetPreviousProgressHop(), m)
+			case P2a:
+				r.SendToChainHead(pgToBroadcast, m.GetPreviousProgressHop(), m)
+			case P3:
+				r.SendToChainHead(pgToBroadcast, m.GetPreviousProgressHop(), m)
+			}
 		}
 	} else {
 		// backward propagation
@@ -409,6 +438,7 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
 	if routedMsg.Progress+1 == r.maxDepth {
+		// 此处处在叶子结点，这边修改处理P2a消息
 		r.HandleP2a(m, routedMsg.GetLastProgressHop())
 	} else {
 		// we are not at the leaf level yet, so need to have a relay setup
@@ -522,7 +552,7 @@ func (r *Replica) readyToRelayP1b(ballot paxi.Ballot, depth uint8) bool {
 
 func (r *Replica) handleP2b(m P2b) {
 	if r.IsLeader() {
-		// we received p2b aggregated reply, so just handle it at the pigpaxos level
+		// we received p2b aggregated reply, so just handle it at the ChainPaxos level
 		r.HandleP2b(m.Slot, m.Ballot, m.ID)
 	} else {
 		// here we handle the P2b coming from the leaf node
@@ -536,7 +566,7 @@ func (r *Replica) handleP2bAggregated(m P2bAggregated) {
 	log.Debugf("Handling P2bAggregated: %v", m)
 	if r.IsLeader() {
 		r.UpdateLastExecuteByNode(m.RelayID, m.RelayLastExecute)
-		// we received p2b aggregated reply, so just handle it at the pigpaxos level
+		// we received p2b aggregated reply, so just handle it at the ChainPaxos level
 		if m.MissingIDs != nil && len(m.MissingIDs) > 0 {
 			ids := make([]paxi.ID, len(r.relayGroups[r.NodeIdsToGroup[m.RelayID]].nodes))
 			copy(ids, r.relayGroups[r.NodeIdsToGroup[m.RelayID]].nodes)
@@ -659,9 +689,9 @@ func (r *Replica) readyToRelayP2b(m int) bool {
 func (r *Replica) handleRequest(m paxi.Request) {
 	log.Debugf("Replica %s received %v\n", r.ID(), m)
 
-	if !*stableLeader || r.PigPaxos.IsLeader() || r.PigPaxos.Ballot() == 0 {
-		r.PigPaxos.HandleRequest(m)
+	if !*stableLeader || r.ChainPaxos.IsLeader() || r.ChainPaxos.Ballot() == 0 {
+		r.ChainPaxos.HandleRequest(m)
 	} else {
-		go r.Forward(r.PigPaxos.Leader(), m)
+		go r.Forward(r.ChainPaxos.Leader(), m)
 	}
 }
