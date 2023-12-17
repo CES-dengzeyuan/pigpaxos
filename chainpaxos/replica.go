@@ -88,8 +88,8 @@ func NewReplica(id paxi.ID) *Replica {
 	r.Register(P2b{}, r.handleP2b)
 	r.Register(P2bAggregated{}, r.handleP2bAggregated)
 	r.Register(P3{}, r.handleP3)
-	//r.Register(P1a{}, r.handleP1a)
-	//r.Register(P2a{}, r.handleP2a)
+
+	r.Register(P2aChain{}, r.handleP2aFollower)
 	r.Register(P3RecoverRequest{}, r.HandleP3RecoverRequest)
 	r.Register(P3RecoverReply{}, r.HandleP3RecoverReply)
 	r.Register(RoutedMsg{}, r.handleRoutedMsg)
@@ -302,10 +302,33 @@ func (r *Replica) SendToChainHead(pg *PeerGroup, originalSourceToExclude paxi.ID
 	// node 1.4,PeerGroup: PeerGroup {nodes=[1.1 1.2 1.3 1.4]} ,exclude 1.1
 	// node 1.9,PeerGroup: PeerGroup {nodes=[1.5 1.6 1.7 1.8 1.9]} ,exclude 1.1
 	// log.Debugf("PeerGroup: %v ,exclude %v", pg, originalSourceToExclude)
+	p, ok := m.Payload.(P2a)
+	// 如果 ok 为 true，说明转换成功，否则说明转换失败
+	p2aChain := P2aChain{}
+	if ok {
+		p2aChain = P2aChain{
+			Ballot:        p.Ballot,
+			Slot:          p.Slot,
+			GlobalExecute: p.GlobalExecute,
+			Command:       p.Command,
+			P3msg:         p.P3msg,
+			Hops:          m.Hops,
+			PeerGroupNode: r.relayGroups[r.myRelayGroup].nodes,
+			exId:          0,
+			nextId:        0,
+			msgCnt:        0,
+			msg:           m,
+		}
+	} else {
+		// 处理转换失败的情况
+		log.Debugf("error")
+		return
+	}
+
 	for _, id := range pg.nodes {
 		if id != r.ID() && id != originalSourceToExclude {
 			log.Debugf("Relay node %v send msg {%v} to %v", r.ID(), m, id)
-			go r.Send(id, m)
+			go r.Send(id, p2aChain)
 			break
 		}
 	}
@@ -392,11 +415,6 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 // Forward Propagation
 //*********************************************************************************************************************
 
-//func (r *Replica) handleP1a(m P1a) {
-//	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
-//	r.HandleP1a(m, m.Ballot.ID())
-//}
-
 func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	needToPropagate := false
 	log.Debugf("Node %v handling p1aRelay msg {%v}", r.ID(), m)
@@ -430,16 +448,65 @@ func (r *Replica) handleP1aRelay(m P1a, routedMsg RoutedMsg) bool {
 	return needToPropagate
 }
 
-//func (r *Replica) handleP2a(m P2a) {
-//	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
-//	r.HandleP2a(m, m.Ballot.ID())
-//}
+func contains(s []paxi.ID, e paxi.ID) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Replica) handleP2aFollower(m P2aChain) bool {
+	// 此处处在叶子结点，这边修改处理P2a消息，此处一定是首节点？
+	// 分普通节点和尾节点两种
+	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
+	maxID := r.relayGroups[r.myRelayGroup].nodes[len(r.relayGroups[r.myRelayGroup].nodes)-1] // 取最后一个元素作为最大 ID
+	if r.ID() == maxID {
+		p2a := P2a{
+			Ballot:        m.Ballot,
+			Slot:          m.Slot,
+			GlobalExecute: m.GlobalExecute,
+			Command:       m.Command,
+			P3msg:         m.P3msg,
+		}
+		log.Debugf("%v", p2a)
+		//r.HandleP2a(p2a, m.msg.GetLastProgressHop())
+	} else {
+		//传递给后面一个节点
+		// r.HandleP2aChain(m)
+		m.Hops = append(m.Hops, r.ID())
+		for _, node := range r.relayGroups[r.myRelayGroup].nodes {
+			// 还需要处理最后一个尾节点？
+			if !contains(m.Hops, node) {
+				log.Debugf("=====%v======", node)
+				r.Send(node, m)
+				break
+			}
+		}
+	}
+	return true
+}
 
 func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
 	if routedMsg.Progress+1 == r.maxDepth {
-		// 此处处在叶子结点，这边修改处理P2a消息
-		r.HandleP2a(m, routedMsg.GetLastProgressHop())
+		log.Debugf("不会被执行")
+		//p2aChain := P2aChain{
+		//	Ballot:        m.Ballot,
+		//	Slot:          m.Slot,
+		//	GlobalExecute: m.GlobalExecute,
+		//	Command:       m.Command,
+		//	P3msg:         m.P3msg,
+		//	Hops:          routedMsg.Hops,
+		//	PeerGroupNode: r.relayGroups[r.myRelayGroup].nodes,
+		//	exId:          0,
+		//	nextId:        0,
+		//	msgCnt:        0,
+		//}
+		//r.handleP2aFollower(p2aChain, routedMsg)
+		//r.handleP2aFollower(m, routedMsg)
+		//注意需要follow节点走chain的逻辑就得 注册这个消息类型和对应的处理函数！！
 	} else {
 		// we are not at the leaf level yet, so need to have a relay setup
 		r.Lock()
@@ -460,7 +527,7 @@ func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 			}
 		}
 		r.Unlock()
-		// self loop
+		// self loop 自身的循环投票
 		r.HandleP2a(m, r.ID())
 	}
 	return true

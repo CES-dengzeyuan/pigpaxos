@@ -39,9 +39,6 @@ type RoutedMsg struct {
 	Progress  uint8
 	Payload   interface{}
 	lock      sync.Mutex
-
-	// 新加字段？
-	//PGNode    []paxi.ID
 }
 
 func (m *RoutedMsg) GetLastProgressHop() paxi.ID {
@@ -54,6 +51,26 @@ func (m *RoutedMsg) GetPreviousProgressHop() paxi.ID {
 
 func (m RoutedMsg) String() string {
 	return fmt.Sprintf("RoutedMsg {Hops=%v IsForward=%v Progress=%v, Payload=%v}", m.Hops, m.IsForward, m.Progress, m.Payload)
+}
+
+type RoutedChainMsg struct {
+	Hops      []paxi.ID
+	IsForward bool
+	Progress  uint8
+	Payload   interface{}
+	lock      sync.Mutex
+}
+
+func (m *RoutedChainMsg) GetLastProgressHop() paxi.ID {
+	return m.Hops[m.Progress]
+}
+
+func (m *RoutedChainMsg) GetPreviousProgressHop() paxi.ID {
+	return m.Hops[m.Progress-1]
+}
+
+func (m RoutedChainMsg) String() string {
+	return fmt.Sprintf("RoutedChainMsg {Hops=%v IsForward=%v Progress=%v, Payload=%v}", m.Hops, m.IsForward, m.Progress, m.Payload)
 }
 
 // P1b promise message
@@ -125,6 +142,7 @@ type P2aChain struct {
 	exId          paxi.ID   //先驱节点
 	nextId        paxi.ID   //后继节点
 	msgCnt        int       //记录选票数
+	msg           RoutedMsg
 }
 
 func (m P2aChain) String() string {

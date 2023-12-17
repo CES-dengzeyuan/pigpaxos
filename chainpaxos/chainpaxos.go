@@ -406,6 +406,11 @@ func (p *ChainPaxos) HandleP2a(m P2a, reply paxi.ID) {
 	log.Debugf("Leaving HandleP2a")
 }
 
+//func (p *ChainPaxos) HandleP2aChain(m P2aChain) {
+//	log.Debugf("Handle P2a by chain")
+//	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
+//}
+
 // HandleP2b handles P2b message
 func (p *ChainPaxos) HandleP2b(msgSlot int, msgBallot paxi.Ballot, votedIds []paxi.ID) {
 	log.Debugf("Entering HandleP2b: ===[bal: %v, slot: %d, votes: %v]===>>> %s", msgBallot, msgSlot, votedIds, p.ID())

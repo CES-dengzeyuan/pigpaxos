@@ -2,6 +2,7 @@ package paxi
 
 import (
 	"pigpaxos/log"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -54,14 +55,38 @@ func (i ID) String() string {
 
 type IDs []ID
 
-func (a IDs) Len() int      { return len(a) }
-func (a IDs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a IDs) Less(i, j int) bool {
-	if a[i].Zone() < a[j].Zone() {
+func (ids IDs) Len() int      { return len(ids) }
+func (ids IDs) Swap(i, j int) { ids[i], ids[j] = ids[j], ids[i] }
+func (ids IDs) Less(i, j int) bool {
+	if ids[i].Zone() < ids[j].Zone() {
 		return true
-	} else if a[i].Zone() > a[j].Zone() {
+	} else if ids[i].Zone() > ids[j].Zone() {
 		return false
 	} else {
-		return a[i].Node() < a[j].Node()
+		return ids[i].Node() < ids[j].Node()
 	}
+}
+
+func compareID(a, b ID) int {
+	switch {
+	case a.Zone() < b.Zone():
+		return -1
+	case a.Zone() > b.Zone():
+		return 1
+	}
+	switch {
+	case a.Node() < b.Node():
+		return -1
+	case a.Node() > b.Node():
+		return 1
+	}
+	return 0
+}
+
+func (ids IDs) Sort() {
+	// 使用 sort.Slice 函数对 ids 进行排序
+	sort.Slice(ids, func(i, j int) bool {
+		// 使用 compareID 函数比较 ids[i] 和 ids[j]
+		return compareID(ids[i], ids[j]) < 0
+	})
 }
