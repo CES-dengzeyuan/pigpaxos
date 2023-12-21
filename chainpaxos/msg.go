@@ -139,15 +139,16 @@ type P2aChain struct {
 
 	Hops          []paxi.ID //链式拓扑
 	PeerGroupNode []paxi.ID //分组，r.relayGroups[r.myRelayGroup]可以直接获取
-	exId          paxi.ID   //先驱节点
-	nextId        paxi.ID   //后继节点
-	msgCnt        int       //记录选票数
-	msg           RoutedMsg
+	//exId          paxi.ID   //先驱节点
+	//nextId        paxi.ID   //后继节点
+	//msgCnt        int       //记录选票数
+	msg     RoutedMsg
+	RelayID paxi.ID
 }
 
 func (m P2aChain) String() string {
-	return fmt.Sprintf("P2aChain {b=%v s=%d cmd=%v, p3Msg=%v, Hops=%v, PeerGroup=%v, exID=%s, nextID=%s, msgCnt"+
-		"=%d}", m.Ballot, m.Slot, m.Command, m.P3msg, m.Hops, m.PeerGroupNode, m.exId, m.nextId, m.msgCnt)
+	return fmt.Sprintf("P2aChain {b=%v s=%d cmd=%v, p3Msg=%v, Hops=%v, PeerGroup=%v"+
+		", ID=%v}", m.Ballot, m.Slot, m.Command, m.P3msg, m.Hops, m.PeerGroupNode, m.RelayID)
 }
 
 // P3 commit message

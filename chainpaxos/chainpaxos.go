@@ -406,10 +406,111 @@ func (p *ChainPaxos) HandleP2a(m P2a, reply paxi.ID) {
 	log.Debugf("Leaving HandleP2a")
 }
 
-//func (p *ChainPaxos) HandleP2aChain(m P2aChain) {
-//	log.Debugf("Handle P2a by chain")
-//	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
-//}
+func (p *ChainPaxos) HandleP2aChain(m P2aChain) {
+	log.Debugf("Handle P2a by chain")
+	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
+
+	// 不需要发送P2b，只需要最后那个节点发送P2b
+
+	if m.Ballot >= p.ballot {
+		p.ballot = m.Ballot
+		p.active = false
+		p.globalExecute = m.GlobalExecute
+		p.logLck.Lock()
+		// update slot number
+		p.slot = paxi.Max(p.slot, m.Slot)
+		// update entry
+		if e, exists := p.log[m.Slot]; exists {
+			if !e.commit && m.Ballot > e.ballot {
+				// different command and request is not nil
+				if !e.command.Equal(m.Command) && e.request != nil {
+					p.Forward(m.Ballot.ID(), *e.request)
+					// p.Retry(*e.request)
+					e.request = nil
+				}
+				e.command = m.Command
+				e.ballot = m.Ballot
+			} else if e.commit && e.ballot == 0 {
+				// we can have commit slot with no ballot when we received P3 before P2a
+				e.command = m.Command
+				e.ballot = m.Ballot
+			}
+		} else {
+			p.log[m.Slot] = &entry{
+				ballot:  m.Ballot,
+				command: m.Command,
+				commit:  false,
+			}
+		}
+		p.logLck.Unlock()
+	}
+
+	if len(m.P3msg.Slot) > 0 {
+		p.HandleP3(m.P3msg)
+	}
+
+	log.Debugf("Leaving HandleP2a")
+}
+
+func (p *ChainPaxos) HandleP2aChainTail(m P2aChain, next paxi.ID) {
+	log.Debugf("Handle P2a by chain")
+	log.Debugf("Replica %s ===[%v]===>>> Replica %s\n", m.Ballot.ID(), m, p.ID())
+
+	if m.Ballot >= p.ballot {
+		p.ballot = m.Ballot
+		p.active = false
+		p.globalExecute = m.GlobalExecute
+		p.logLck.Lock()
+		// update slot number
+		p.slot = paxi.Max(p.slot, m.Slot)
+		// update entry
+		if e, exists := p.log[m.Slot]; exists {
+			if !e.commit && m.Ballot > e.ballot {
+				// different command and request is not nil
+				if !e.command.Equal(m.Command) && e.request != nil {
+					p.Forward(m.Ballot.ID(), *e.request)
+					// p.Retry(*e.request)
+					e.request = nil
+				}
+				e.command = m.Command
+				e.ballot = m.Ballot
+			} else if e.commit && e.ballot == 0 {
+				// we can have commit slot with no ballot when we received P3 before P2a
+				e.command = m.Command
+				e.ballot = m.Ballot
+			}
+		} else {
+			p.log[m.Slot] = &entry{
+				ballot:  m.Ballot,
+				command: m.Command,
+				commit:  false,
+			}
+		}
+		p.logLck.Unlock()
+	}
+
+	idList := make([]paxi.ID, 1, 1)
+	idList[0] = p.ID()
+
+	//p.Send(next, P2b{
+	//	Ballot: p.ballot,
+	//	Slot:   m.Slot,
+	//	ID:     idList,
+	//})
+
+	p.Send(m.RelayID, P2b{
+		Ballot: p.ballot,
+		Slot:   m.Slot,
+		ID:     idList,
+	})
+
+	if len(m.P3msg.Slot) > 0 {
+		p.HandleP3(m.P3msg)
+	}
+
+	log.Debugf("Leaving HandleP2a")
+
+}
 
 // HandleP2b handles P2b message
 func (p *ChainPaxos) HandleP2b(msgSlot int, msgBallot paxi.Ballot, votedIds []paxi.ID) {

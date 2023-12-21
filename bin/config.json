@@ -34,7 +34,7 @@
         "K": 1000,
         "W": 0.5,
         "Throttle": 3000,
-        "Concurrency": 1,
+        "Concurrency": 25,
         "Distribution": "conflict",
         "LinearizabilityCheck": true,
         "Conflicts": 0,

@@ -314,29 +314,23 @@ func (r *Replica) SendToChainHead(pg *PeerGroup, originalSourceToExclude paxi.ID
 			P3msg:         p.P3msg,
 			Hops:          m.Hops,
 			PeerGroupNode: r.relayGroups[r.myRelayGroup].nodes,
-			exId:          0,
-			nextId:        0,
-			msgCnt:        0,
 			msg:           m,
+			RelayID:       r.ID(),
 		}
 	} else {
 		// 处理转换失败的情况
-		log.Debugf("error")
+		// error msg is {RoutedMsg {Hops=[1.1 1.6] IsForward=true Progress=1, Payload=P3 {b=1.1.1 slots=[]}}}
+		log.Debugf("error msg is {%v}", m)
 		return
 	}
 
 	for _, id := range pg.nodes {
 		if id != r.ID() && id != originalSourceToExclude {
-			log.Debugf("Relay node %v send msg {%v} to %v", r.ID(), m, id)
+			log.Debugf("Relay node %v send msg {%v} to %v", r.ID(), p2aChain, id)
 			go r.Send(id, p2aChain)
 			break
 		}
 	}
-}
-
-func (r *Replica) SendAmongPeer(pg *PeerGroup, nodeToExclude []paxi.ID, m RoutedMsg) {
-	log.Debugf("")
-
 }
 
 func (r *Replica) Send(to paxi.ID, m interface{}) error {
@@ -396,7 +390,8 @@ func (r *Replica) handleRoutedMsg(m RoutedMsg) {
 			case P2a:
 				r.SendToChainHead(pgToBroadcast, m.GetPreviousProgressHop(), m)
 			case P3:
-				r.SendToChainHead(pgToBroadcast, m.GetPreviousProgressHop(), m)
+				// 思考P3的消息作用及处理方式 TODO
+				// r.SendToChainHead(pgToBroadcast, m.GetPreviousProgressHop(), m)
 			}
 		}
 	} else {
@@ -472,9 +467,11 @@ func (r *Replica) handleP2aFollower(m P2aChain) bool {
 		}
 		log.Debugf("%v", p2a)
 		//r.HandleP2a(p2a, m.msg.GetLastProgressHop())
+		r.HandleP2aChainTail(m, r.fixedRelays[r.myRelayGroup])
+
 	} else {
 		//传递给后面一个节点
-		// r.HandleP2aChain(m)
+		r.HandleP2aChain(m)
 		m.Hops = append(m.Hops, r.ID())
 		for _, node := range r.relayGroups[r.myRelayGroup].nodes {
 			// 还需要处理最后一个尾节点？
@@ -491,22 +488,8 @@ func (r *Replica) handleP2aFollower(m P2aChain) bool {
 func (r *Replica) handleP2aRelay(m P2a, routedMsg RoutedMsg) bool {
 	log.Debugf("Node %v handling msg {%v}", r.ID(), m)
 	if routedMsg.Progress+1 == r.maxDepth {
+		// follower节点，不会走这边的逻辑，中继节点发送的P2achain
 		log.Debugf("不会被执行")
-		//p2aChain := P2aChain{
-		//	Ballot:        m.Ballot,
-		//	Slot:          m.Slot,
-		//	GlobalExecute: m.GlobalExecute,
-		//	Command:       m.Command,
-		//	P3msg:         m.P3msg,
-		//	Hops:          routedMsg.Hops,
-		//	PeerGroupNode: r.relayGroups[r.myRelayGroup].nodes,
-		//	exId:          0,
-		//	nextId:        0,
-		//	msgCnt:        0,
-		//}
-		//r.handleP2aFollower(p2aChain, routedMsg)
-		//r.handleP2aFollower(m, routedMsg)
-		//注意需要follow节点走chain的逻辑就得 注册这个消息类型和对应的处理函数！！
 	} else {
 		// we are not at the leaf level yet, so need to have a relay setup
 		r.Lock()
@@ -736,12 +719,20 @@ func (r *Replica) readyToRelayP2b(m int) bool {
 	if r.p2bRelaysMapByBalSlot[m] == nil {
 		return false
 	}
-	pgToRelay := r.relayGroups[r.myRelayGroup]
+	//pgToRelay := r.relayGroups[r.myRelayGroup]
 	p2b := r.p2bRelaysMapByBalSlot[m].Payload.(P2b)
-	if len(p2b.ID) == len(pgToRelay.nodes)-r.relaySlack {
+	//if len(p2b.ID) == len(pgToRelay.nodes)-r.relaySlack {
+	//	return true
+	//}
+	//if len(p2b.ID) == len(pgToRelay.nodes)-1-r.relaySlack {
+	//	if r.NodeIdsToGroup[p2b.Ballot.ID()] == r.myRelayGroup {
+	//		return true
+	//	}
+	//}
+	if len(p2b.ID) == 2-r.relaySlack {
 		return true
 	}
-	if len(p2b.ID) == len(pgToRelay.nodes)-1-r.relaySlack {
+	if len(p2b.ID) == 2-r.relaySlack {
 		if r.NodeIdsToGroup[p2b.Ballot.ID()] == r.myRelayGroup {
 			return true
 		}
