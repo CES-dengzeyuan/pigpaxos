@@ -14,8 +14,8 @@ import (
 const GrayTimeoutMultiplier = 1000
 const TickerDuration = 10
 
-var stableLeader = flag.Bool("ephemeral", false, "stable leader, if true paxos forward request to current leader")
-var pg = flag.Int("pg", 2, "Number of peer-groups. Default is 2")
+var stableLeader = flag.Bool("ephemeral", true, "stable leader, if true paxos forward request to current leader")
+var pg = flag.Int("pg", 1, "Number of peer-groups. Default is 2")
 var regionPeerGroups = flag.Bool("rpg", false, "use region as a peer group instead")
 var useSmallP2b = flag.Bool("smallp2b", true, "use small p2b aggregated message that put missing IDs instead of voted ids")
 var stdPigTimeout = flag.Int("stdpigtimeout", 50, "Standard timeout after which all non-collected responses are treated as failures")

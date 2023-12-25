@@ -29,7 +29,7 @@
     "multiversion": false,
     "use_retro_log": false,
     "benchmark": {
-        "T": 2,
+        "T": 60,
         "N": 0,
         "K": 1000,
         "W": 0.5,

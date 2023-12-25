@@ -13,7 +13,7 @@ with open('data.csv', 'w', newline='') as csvfile:
     writer.writeheader()
 
     # 使用glob模块匹配文件名模式
-    for filename in glob('client.*.log'):
+    for filename in sorted(glob('client.*.log')):
         with open(filename, 'r') as file:
             log_content = file.read()
 
